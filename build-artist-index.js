@@ -212,17 +212,18 @@ async function fetchArtistProfile(handle, memeCount) {
 
   const { td, profile } = result;
 
-  const tdh      = td?.boosted_tdh || td?.tdh || 0;
-  const unique   = td?.unique_memes || 0;
-  const boost    = td?.boost || 1.0;
-  const fullSet  = (td?.memes_cards_sets || 0) >= 1;
-  const nakamoto = (td?.nakamoto || 0) > 0;
-  const address  = td?.consolidation_display || profile.profile?.handle || handle;
-  const wallets  = (profile.consolidation?.wallets || []).map(w => w?.wallet?.address).filter(Boolean);
-  const primary  = profile.profile?.primary_wallet || null;
+  const tdh           = td?.boosted_tdh || td?.tdh || 0;
+  const unique        = td?.unique_memes || 0;
+  const boost         = td?.boost || 1.0;
+  const fullSet       = (td?.memes_cards_sets || 0) >= 1;
+  const nakamotoCount = td?.nakamoto || 0;
+  const nakamoto      = nakamotoCount > 0;
+  const address       = td?.consolidation_display || profile.profile?.handle || handle;
+  const wallets       = (profile.consolidation?.wallets || []).map(w => w?.wallet?.address).filter(Boolean);
+  const primary       = profile.profile?.primary_wallet || null;
 
   const stats = {
-    tdh, boost, unique, fullSet, nakamoto,
+    tdh, boost, unique, fullSet, nakamoto, nakamotoCount,
     level:           profile.level            || 0,
     rep:             profile.rep              || 0,
     nic:             profile.cic?.cic_rating  || 0,

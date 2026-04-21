@@ -77,6 +77,7 @@ function enrichSigil(data) {
     unique:          0,
     fullSet:         false,
     nakamoto:        false,
+    nakamotoCount:   0,
     nic:             0,
     rep:             0,
     memeArtist:      false,
@@ -89,7 +90,9 @@ function enrichSigil(data) {
   next.level           = Number(next.level)           || 0;
   next.unique          = Number(next.unique)          || 0;
   next.fullSet         = Boolean(next.fullSet);
-  next.nakamoto        = Boolean(next.nakamoto);
+  // Nakamoto — keep bool for existing checks, track count for multi-holders
+  next.nakamotoCount   = Math.max(0, Number(next.nakamotoCount) || (next.nakamoto ? 1 : 0));
+  next.nakamoto        = next.nakamotoCount > 0;
   next.nic             = Number(next.nic)             || 0;
   next.rep             = Number(next.rep)             || 0;
   next.memeArtistCount = Math.max(0, Number(next.memeArtistCount) || 0);
@@ -308,7 +311,7 @@ function buildHUD() {
     ['NIC',         sigil.nic.toLocaleString()],
     ['REP',         sigil.rep.toLocaleString()],
     ['FULL SET',    sigil.fullSet  ? 'YES' : 'NO'],
-    ['NAKAMOTO',    sigil.nakamoto ? 'YES' : 'NO'],
+    ['NAKAMOTO',    (sigil.nakamotoCount || 0) > 0 ? String(sigil.nakamotoCount) : 'NO'],
     ['MEME ARTIST', artistN > 0 ? `${artistN} card${artistN > 1 ? 's' : ''}` : 'NO'],
   ];
   document.getElementById('hudParams').innerHTML = params
@@ -869,6 +872,11 @@ function drawForm() {
 
   // 3. Central sun (TDH — compact crystal burst)
   drawSolarCore(ctx2, FF.cx, FF.cy);
+
+  // 3a. TDH spectrum waves — one wavy concentric band per 1M TDH (cap 30).
+  //     Lives between the solar core and the innermost orbital ring.
+  //     A visible testament to millions of days held.
+  drawSpectrumWaves(ctx2);
 
   // 3b. Consolidation satellites (merged wallets = moons)
   drawConsolidationMoons(ctx2);
@@ -1452,34 +1460,99 @@ function drawNakamotoBracelet(ctx) {
     ctx.fill();
   }
 
-  // ── Fast-spinning gold orb — one full lap of the bracelet every 3s ──
+  // ── Fast-spinning gold orbs — one per held Nakamoto, evenly spaced ──
+  // Single holder → 1 ball. 2 holders → 2 balls 180° apart. N → evenly spaced.
+  // All balls share the 3s lap cadence; their phases are offset around the bracelet.
+  const ballCount = Math.max(1, Math.min(10, sigil.nakamotoCount || 1));
   const ballT     = (T / 3) % 1;
-  const ballIdx   = Math.floor(ballT * segs);
-  const bp        = basePts[ballIdx];
-  const br        = 6 * FF.sigilScale + bp.depth * 2.2;
-  const ballAlpha = (0.85 + bp.depth * 0.15) * focusMul;
+  for (let bi = 0; bi < ballCount; bi++) {
+    const phase     = (ballT + bi / ballCount) % 1;
+    const ballIdx   = Math.floor(phase * segs);
+    const bp        = basePts[ballIdx];
+    const br        = 6 * FF.sigilScale + bp.depth * 2.2;
+    const ballAlpha = (0.85 + bp.depth * 0.15) * focusMul;
 
-  // Outer glow
-  const glow = ctx.createRadialGradient(bp.x, bp.y, 0, bp.x, bp.y, br * 6);
-  glow.addColorStop(0,    `hsla(54, 100%, 96%, ${ballAlpha})`);
-  glow.addColorStop(0.22, `hsla(48, 100%, 74%, ${ballAlpha * 0.55})`);
-  glow.addColorStop(0.55, `hsla(44, 100%, 55%, ${ballAlpha * 0.18})`);
-  glow.addColorStop(1,    'transparent');
-  ctx.fillStyle = glow;
-  ctx.beginPath();
-  ctx.arc(bp.x, bp.y, br * 6, 0, Math.PI * 2);
-  ctx.fill();
+    // Outer glow
+    const glow = ctx.createRadialGradient(bp.x, bp.y, 0, bp.x, bp.y, br * 6);
+    glow.addColorStop(0,    `hsla(54, 100%, 96%, ${ballAlpha})`);
+    glow.addColorStop(0.22, `hsla(48, 100%, 74%, ${ballAlpha * 0.55})`);
+    glow.addColorStop(0.55, `hsla(44, 100%, 55%, ${ballAlpha * 0.18})`);
+    glow.addColorStop(1,    'transparent');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(bp.x, bp.y, br * 6, 0, Math.PI * 2);
+    ctx.fill();
 
-  // Warm-white core
-  ctx.beginPath();
-  ctx.arc(bp.x, bp.y, br * 0.55, 0, Math.PI * 2);
-  ctx.fillStyle = `hsla(56, 100%, 98%, ${Math.min(1, ballAlpha + 0.05)})`;
-  ctx.fill();
+    // Warm-white core
+    ctx.beginPath();
+    ctx.arc(bp.x, bp.y, br * 0.55, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(56, 100%, 98%, ${Math.min(1, ballAlpha + 0.05)})`;
+    ctx.fill();
+  }
 
   ctx.restore();
 }
 
 // (Old emanation removed — Meme Artist is now the 7th orbital ring, rainbow)
+
+// ── TDH Spectrum Waves — one wavy concentric band per 1M TDH ─────
+// The interior of the solar core becomes a record of millions-of-days-held.
+// Count = floor(tdh / 1_000_000), capped at 30 for visual density.
+// Each wave: wavy ring (organic perturbation) + distinct hue across the spectrum.
+// Sits between the solar flare zone and the innermost orbital (TDH ring at rf=0.18).
+function drawSpectrumWaves(ctx) {
+  const tdh = sigil.tdh || 0;
+  const waveCount = Math.min(30, Math.floor(tdh / 1_000_000));
+  if (waveCount <= 0) return;
+
+  // Wave band: from just outside the solar core to just inside the TDH ring
+  const innerR = 18 * FF.sigilScale;
+  const outerR = FF.sigilR * 0.16;
+  if (outerR <= innerR) return;
+  const step   = (outerR - innerR) / Math.max(1, waveCount);
+
+  const segs = perfMode ? 48 : 96;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  for (let w = 0; w < waveCount; w++) {
+    const rBase = innerR + step * (w + 0.5);
+    // Each wave walks the full spectrum — waveCount 1 = single hue, many = full rainbow
+    const hue = ((w / Math.max(1, waveCount)) * 360 + T * 12) % 360;
+    const phase = w * 1.3 + T * 0.45;
+    const noiseAmp = rBase * 0.10;  // organic perturbation amount
+
+    // Build wavy path
+    ctx.beginPath();
+    for (let i = 0; i <= segs; i++) {
+      const a = (i / segs) * Math.PI * 2;
+      // 3-harmonic wave: gives an organic, asymmetric shape that slowly morphs
+      const wave =
+        Math.sin(a * 3 + phase)       * 0.55 +
+        Math.sin(a * 5 + phase * 1.3) * 0.28 +
+        Math.sin(a * 7 + phase * 0.7) * 0.17;
+      const r = rBase + wave * noiseAmp;
+      const p3 = ringPt(a, r, 0, 0);
+      const p2 = project3D(p3.x, p3.y, p3.z);
+      if (i === 0) ctx.moveTo(p2.x, p2.y);
+      else         ctx.lineTo(p2.x, p2.y);
+    }
+    // Outer line — saturated, soft
+    ctx.strokeStyle = `hsla(${hue}, 88%, 70%, 0.42)`;
+    ctx.lineWidth   = 0.8 + FF.sigilScale * 0.35;
+    ctx.stroke();
+
+    // Inner crisp highlight for depth
+    if (!perfMode) {
+      ctx.strokeStyle = `hsla(${hue}, 100%, 88%, 0.22)`;
+      ctx.lineWidth   = 0.4;
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
 
 // ── TDH Solar Core — compact ray burst (crystal burst) ────────────
 // Reference: a small dense core + 4/6-arm crystal flare rays
@@ -1589,7 +1662,10 @@ const PARAM_INFO = {
   artist:   { name: 'MEME ARTIST', desc: 'memes card creator',  rainbow: true,
               value: s => `${s.memeArtistCount} card${s.memeArtistCount > 1 ? 's' : ''}` },
   fullSet:  { name: 'FULL SET',    desc: 'complete collection', hue: 155, value: () => 'YES' },
-  nakamoto: { name: 'NAKAMOTO',    desc: 'card #4 holder',      hue:  48, value: () => 'YES' },
+  nakamoto: { name: 'NAKAMOTO',    desc: 'card #4 holder',      hue:  48, value: s => {
+    const n = s.nakamotoCount || 0;
+    return n > 0 ? `${n} card${n > 1 ? 's' : ''}` : 'YES';
+  } },
 };
 
 // Hover/pin state — key based ('tdh', 'artist', 'fullSet', 'nakamoto', ...)
@@ -1890,6 +1966,7 @@ async function fetchSigilFromApi(addr) {
     unique,
     fullSet:         (tdhData.memes_cards_sets || 0) >= 1,
     nakamoto:        (tdhData.nakamoto || 0) > 0,
+    nakamotoCount:   tdhData.nakamoto || 0,
     nic,
     rep,
     memeArtist:      memeArtistCount > 0,
