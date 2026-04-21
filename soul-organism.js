@@ -1009,13 +1009,18 @@ function drawArmillaryFrame(ctx) {
   ctx.restore();
 }
 
-// ── MEME ARTIST — bilezik boncukları (her ekstra kart için minik rainbow halka) ──
+// ── MEME ARTIST — iridescent spektrum boncukları (her ekstra kart için bir inci) ──
 // Ana artist halkası LAYERS'ta rf 0.86'da. Count ≥ 2 ise ana halka üzerine
-// (count − 1) küçük outline ring "boncuk" gibi yerleşir ve ring ile birlikte döner.
+// (count − 1) inci yerleşir ve ring ile birlikte döner.
+// Her inci = 3-hue'lu pearl gradient (spektrum sheen) + off-center highlight.
+// Cap: artist-index'teki maksimum kart sayısı (bugün 6529er=25; rebuild ile dinamik).
 function drawArtistBeads(ctx) {
   const count = soul.memeArtistCount || 0;
   if (!soul.memeArtist || count < 2) return;
-  const beadN = Math.min(16, count - 1);           // 2 kart→1 boncuk, 10 kart→9 boncuk (cap 16)
+
+  // Dinamik cap: koleksiyondaki en verimli sanatçıyı tavan say
+  const collectionMax = (_artistIndex && _artistIndex._maxCount) || 25;
+  const beadN = Math.min(collectionMax - 1, count - 1);
 
   // Ana artist halkasının parametreleri (LAYERS son girdisi)
   const artistLayer = LAYERS[LAYERS.length - 1];
@@ -1023,7 +1028,7 @@ function drawArtistBeads(ctx) {
   const incl   = artistLayer.incl;
   const az     = artistLayer.az;
 
-  const beadR        = 7 * FF.soulScale + 2;       // küçük ama fark edilir
+  const beadR        = 10 * FF.soulScale + 3;      // daha belirgin (önce 7*s+2)
   const rainbowSpeed = 360 / 30;                   // ana halka ile aynı ritim
   const orbitPhase   = T * LOOP_DOT * 0.65;        // diğer ring dot'larıyla aynı hız
 
@@ -1035,30 +1040,48 @@ function drawArtistBeads(ctx) {
     const p3  = ringPt(ang, radius, incl, az);
     const p2  = project3D(p3.x, p3.y, p3.z);
     const depth = p2.depth;
-    const hue   = (((i / beadN) * 360) + T * rainbowSpeed) % 360;
-    const r     = beadR * (0.55 + depth * 0.70);
+    const r     = beadR * (0.60 + depth * 0.60);
 
-    // Dış glow
-    const g = ctx.createRadialGradient(p2.x, p2.y, 0, p2.x, p2.y, r * 2.2);
-    g.addColorStop(0,    `hsla(${hue}, 100%, 90%, ${(0.40 + depth * 0.35)})`);
-    g.addColorStop(0.5,  `hsla(${hue}, 100%, 72%, ${(0.18 + depth * 0.22)})`);
-    g.addColorStop(1,    'transparent');
-    ctx.fillStyle = g;
+    // Spektrum pozisyonu — her inci farklı renk ailesinde (rainbow ring ile senkron)
+    const baseHue = (((i / beadN) * 360) + T * rainbowSpeed) % 360;
+    const h1 = (baseHue - 48 + 360) % 360;   // sol-komşu hue
+    const h2 = baseHue;                       // ana hue
+    const h3 = (baseHue + 48) % 360;          // sağ-komşu hue
+
+    // 1) Dış rainbow glow — belirgin, yayılan
+    const outer = ctx.createRadialGradient(p2.x, p2.y, 0, p2.x, p2.y, r * 3.2);
+    outer.addColorStop(0,    `hsla(${h2}, 100%, 88%, ${0.50 + depth * 0.30})`);
+    outer.addColorStop(0.45, `hsla(${h2}, 100%, 68%, ${0.22 + depth * 0.18})`);
+    outer.addColorStop(1,    'transparent');
+    ctx.fillStyle = outer;
     ctx.beginPath();
-    ctx.arc(p2.x, p2.y, r * 2.2, 0, Math.PI * 2);
+    ctx.arc(p2.x, p2.y, r * 3.2, 0, Math.PI * 2);
     ctx.fill();
 
-    // Outline ring (boncuk halkası)
+    // 2) İnci gövdesi — off-center highlight + 3-hue iridescent geçiş (prizma sheen)
+    const offX = -r * 0.35;
+    const offY = -r * 0.35;
+    const pearl = ctx.createRadialGradient(p2.x + offX, p2.y + offY, 0, p2.x, p2.y, r);
+    pearl.addColorStop(0,    `hsla(${h1}, 100%, 94%, 0.95)`);
+    pearl.addColorStop(0.40, `hsla(${h2}, 100%, 78%, 0.88)`);
+    pearl.addColorStop(0.80, `hsla(${h3}, 100%, 62%, ${0.72 + depth * 0.18})`);
+    pearl.addColorStop(1,    `hsla(${h3}, 100%, 45%, ${0.52 + depth * 0.18})`);
+    ctx.fillStyle = pearl;
     ctx.beginPath();
     ctx.arc(p2.x, p2.y, r, 0, Math.PI * 2);
-    ctx.strokeStyle = `hsla(${hue}, 100%, ${72 + depth * 20}%, ${0.70 + depth * 0.25})`;
-    ctx.lineWidth   = 1.2 + depth * 0.6;
+    ctx.fill();
+
+    // 3) Crisp outline (tanımı belirginleştirir)
+    ctx.beginPath();
+    ctx.arc(p2.x, p2.y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(${h2}, 100%, ${85 + depth * 10}%, ${0.45 + depth * 0.30})`;
+    ctx.lineWidth   = 1.0 + depth * 0.6;
     ctx.stroke();
 
-    // İç beyaz çekirdek (küçük parıltı)
+    // 4) Parlak highlight noktası — inci shimmer'ı
     ctx.beginPath();
-    ctx.arc(p2.x, p2.y, r * 0.35, 0, Math.PI * 2);
-    ctx.fillStyle = `hsla(0, 0%, 100%, ${0.55 + depth * 0.30})`;
+    ctx.arc(p2.x + offX * 0.7, p2.y + offY * 0.7, r * 0.28, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(0, 0%, 100%, ${0.80 + depth * 0.20})`;
     ctx.fill();
   }
 
@@ -1792,8 +1815,12 @@ async function loadArtistIndex() {
     _artistIndex = await resp.json();
   } catch (err) {
     console.warn('[artist-index] load failed:', err.message);
-    _artistIndex = { handles: {}, wallets: {}, manualOverrides: {} };
+    _artistIndex = { handles: {}, wallets: {} };
   }
+  // Cache max card count across all artists — drives bead cap dinamik olarak
+  // (6529er bugünün zirvesi; biri kırarsa artist-index rebuild ile otomatik güncellenir)
+  const counts = Object.values(_artistIndex.handles || {});
+  _artistIndex._maxCount = counts.length ? Math.max(...counts) : 25;
   return _artistIndex;
 }
 
