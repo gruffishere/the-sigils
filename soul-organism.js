@@ -1899,6 +1899,186 @@ async function fetchSoulFromApi(addr) {
 }
 
 // ══════════════════════════════════════════════════════════
+//  MINI SOUL — küçük, statik, kin kartları için
+// ══════════════════════════════════════════════════════════
+// Tek kare, animasyonsuz. Sadece: aura + core + 3 ring + rare formlar (varsa).
+// Her kin kartında 120-130px'lik bir canvas'a çizilir.
+function drawMiniSoul(canvas, soulLike, baseHue) {
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const sizeCss = canvas.clientWidth || 120;
+  canvas.width  = Math.round(sizeCss * dpr);
+  canvas.height = Math.round(sizeCss * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const W = sizeCss, H = sizeCss;
+  const cx = W / 2, cy = H / 2;
+  const R  = Math.min(W, H) * 0.42;
+
+  const hue = (typeof baseHue === 'number') ? baseHue : 200;
+  const tdhN = normalizeTDH(soulLike.tdh || 0);
+  const boostN = clamp((soulLike.boost || 1 - 1.0) / 1.3, 0, 1);
+  const uniN   = clamp((soulLike.unique || 0) / 484, 0, 1);
+  const repN   = normalizeRep(soulLike.rep || 0);
+  const nicN   = normalizeNic(soulLike.nic || 0);
+  const levelN = clamp((soulLike.level || 0) / 100, 0, 1);
+
+  // Arka plan
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  // Soft aura
+  const aura = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.25);
+  aura.addColorStop(0,   `hsla(${hue}, 70%, 18%, 0.70)`);
+  aura.addColorStop(0.6, `hsla(${hue}, 60%, 10%, 0.25)`);
+  aura.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = aura;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  // 3 orbital ring (TDH amber, UNIQUE cyan, REP sage)
+  const rings = [
+    { hue:  42, rf: 0.30, strength: tdhN    },
+    { hue: 190, rf: 0.52, strength: uniN    },
+    { hue: 110, rf: 0.72, strength: repN    },
+  ];
+  for (const ring of rings) {
+    const rad = R * ring.rf;
+    const alpha = 0.20 + ring.strength * 0.55;
+    ctx.beginPath();
+    ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(${ring.hue}, 85%, 72%, ${alpha})`;
+    ctx.lineWidth = 1.0 + ring.strength * 1.2;
+    ctx.stroke();
+  }
+
+  // Nakamoto — altın bilezik halkası
+  if (soulLike.nakamoto) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.88, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(48, 100%, 72%, 0.80)`;
+    ctx.lineWidth = 2.0;
+    ctx.stroke();
+  }
+  // Full Set — dikenli dış çember (sade: sadece halka)
+  if (soulLike.fullSet) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.96, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(155, 85%, 68%, 0.70)`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+  // Meme Artist — rainbow ring (conic)
+  if (soulLike.memeArtist) {
+    const rad = R * 0.86;
+    const segs = 36;
+    for (let i = 0; i < segs; i++) {
+      const a1 = (i / segs) * Math.PI * 2;
+      const a2 = ((i + 1) / segs) * Math.PI * 2;
+      const h  = (i / segs) * 360;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, a1, a2);
+      ctx.strokeStyle = `hsla(${h}, 95%, 68%, 0.85)`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  // Solar core — kompakt parlak merkez
+  const coreR = lerp(4, 9, tdhN);
+  const inner = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 3);
+  inner.addColorStop(0,   `hsla(${hue}, 95%, 94%, 0.95)`);
+  inner.addColorStop(0.3, `hsla(${hue}, 90%, 72%, 0.55)`);
+  inner.addColorStop(1,   'transparent');
+  ctx.fillStyle = inner;
+  ctx.beginPath();
+  ctx.arc(cx, cy, coreR * 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, coreR * 0.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ══════════════════════════════════════════════════════════
+//  KIN — aynı Soul Name modifier/archetype'ı paylaşan artist'ler
+// ══════════════════════════════════════════════════════════
+// Öncelik hiyerarşisi:
+//   1) TWIN         — aynı tam Soul Name
+//   2) SAME MODIFIER — aynı modifier, farklı archetype
+//   3) SAME ARCHETYPE — aynı archetype, farklı modifier
+//   4) SAME TIER     — hiçbiri tutmadıysa aynı tier
+// Her bucket içinde TDH yakınlığına göre sıralanır (daha yakın ruhlar önce).
+// User'ın kendisi (eğer artist ise) hariç tutulur.
+function findKin(userSoul, userHandle) {
+  if (!_artistIndex || !_artistIndex.profiles) return [];
+  const profiles = _artistIndex.profiles;
+
+  // User Soul Name'i hesapla
+  const userSoulName = generateSoulName(userSoul);
+  const [userMod, ...restArr] = userSoulName.split(' ');
+  const userArch = restArr.join(' ');
+  const userTier = (typeof getSoulClass === 'function') ? (getSoulClass(userSoul.tdh).tier || 1) : 1;
+  const userTdh  = userSoul.tdh || 0;
+  const exclude  = (userHandle || '').toLowerCase();
+
+  // Adayları TDH yakınlığına göre sırala
+  const entries = Object.entries(profiles)
+    .filter(([h]) => h !== exclude)
+    .map(([h, p]) => ({
+      handle: h,
+      profile: p,
+      tdhDist: Math.abs((p.stats?.tdh || 0) - userTdh),
+    }));
+
+  const twins   = entries.filter(e => e.profile.soulName === userSoulName);
+  const modKin  = entries.filter(e => e.profile.modifier === userMod  && e.profile.archetype !== userArch);
+  const archKin = entries.filter(e => e.profile.archetype === userArch && e.profile.modifier !== userMod);
+  const tierKin = entries.filter(e => e.profile.tier === userTier && e.profile.modifier !== userMod && e.profile.archetype !== userArch);
+
+  for (const bucket of [twins, modKin, archKin, tierKin]) {
+    bucket.sort((a, b) => a.tdhDist - b.tdhDist);
+  }
+
+  // Çeşitlilik odaklı seçim: öncelikle her kategoriden birer kişi almaya çalış
+  const kin = [];
+  const used = new Set();
+  const takeFrom = (bucket, reason) => {
+    for (const e of bucket) {
+      if (kin.length >= 3) return;
+      if (used.has(e.handle)) continue;
+      used.add(e.handle);
+      kin.push({ handle: e.handle, profile: e.profile, reason });
+      return;
+    }
+  };
+  takeFrom(twins,   'TWIN');
+  takeFrom(modKin,  'SAME MODIFIER');
+  takeFrom(archKin, 'SAME ARCHETYPE');
+  // Kalan slot varsa priority sırasına göre doldur
+  while (kin.length < 3) {
+    let added = false;
+    for (const [bucket, reason] of [[twins,'TWIN'],[modKin,'SAME MODIFIER'],[archKin,'SAME ARCHETYPE'],[tierKin,'SAME TIER']]) {
+      for (const e of bucket) {
+        if (used.has(e.handle)) continue;
+        used.add(e.handle);
+        kin.push({ handle: e.handle, profile: e.profile, reason });
+        added = true;
+        break;
+      }
+      if (kin.length >= 3 || added) break;
+    }
+    if (!added) break;
+  }
+  return kin;
+}
+
+// ══════════════════════════════════════════════════════════
 //  LIVE DATA — 10 dk'da bir otomatik refresh + manuel retrigger
 // ══════════════════════════════════════════════════════════
 let _currentAddr      = null;
@@ -1980,6 +2160,141 @@ function stopAutoRefresh() {
   if (_timestampInterval) clearInterval(_timestampInterval);
   _refreshInterval = _timestampInterval = null;
 }
+
+// ══════════════════════════════════════════════════════════
+//  KIN OVERLAY — buton açar, 3 kin kartını doldurur, tıkla → ziyaret et
+// ══════════════════════════════════════════════════════════
+let _lastKin = [];
+
+async function openKin() {
+  if (!soul) return;
+  const overlay = document.getElementById('kinOverlay');
+  if (!overlay) return;
+
+  // Veri henüz yüklenmediyse yükle
+  await loadArtistIndex();
+
+  // Mevcut soul'un handle'ını çıkar (address içinden ENS veya artist-index'ten)
+  // soul.address API'den "consolidation_display" gelmişse karışık olabilir; profile
+  // handle'ını güvenilir şekilde bilmiyoruz. Self-exclusion için adresi normalize ederiz.
+  const userHandleCandidate = inferUserHandle(soul);
+  const kin = findKin(soul, userHandleCandidate);
+  _lastKin = kin;
+
+  // Merkez kart — kullanıcı
+  const userSoulName = generateSoulName(soul);
+  document.getElementById('kinCenterName').textContent = userSoulName || '—';
+  const countLabel = kin.length === 0
+    ? 'no kin yet in the archive'
+    : `${kin.length} kindred soul${kin.length > 1 ? 's' : ''}`;
+  document.getElementById('kinCenterSub').textContent = countLabel;
+
+  // Kin kartlarını doldur
+  const cards = overlay.querySelectorAll('.kin-card');
+  cards.forEach((card, i) => {
+    const k = kin[i];
+    if (!k) {
+      card.classList.remove('visible');
+      return;
+    }
+    card.classList.add('visible');
+    card.querySelector('.kin-bond').textContent   = k.reason;
+    card.querySelector('.kin-name').textContent   = k.profile.soulName;
+    card.querySelector('.kin-handle').textContent = k.profile.handle;
+    const addr = k.profile.primary_wallet || '';
+    card.querySelector('.kin-addr').textContent = addr ? shortAddr(addr) : '';
+
+    // Mini soul render
+    const canvas = card.querySelector('.kin-mini');
+    const kinHue = soulHue(k.profile.primary_wallet || k.profile.handle);
+    drawMiniSoul(canvas, k.profile.stats || {}, kinHue);
+  });
+
+  // SVG çizgileri merkezden kartlara çiz
+  overlay.classList.add('visible');
+  // Layout yerleştiğinden emin olmak için 1 frame bekle
+  requestAnimationFrame(() => drawKinLines(overlay));
+}
+
+function closeKin() {
+  const overlay = document.getElementById('kinOverlay');
+  if (overlay) overlay.classList.remove('visible');
+}
+
+async function visitKin(slotIdx) {
+  const k = _lastKin[slotIdx];
+  if (!k) return;
+  closeKin();
+
+  // Input'u güncelle ve readSoul çağır — yeni kullanıcı bu kin'i ziyaret ediyor
+  const input = document.getElementById('walletInput');
+  if (input) input.value = k.profile.handle;
+
+  // Main app'in readSoul'u input'tan değer alıyor, bu yüzden sadece çağırmamız yeterli
+  if (typeof readSoul === 'function') {
+    // renderSoul aktif olduğu için önce reset ya da direkt yeni render
+    // readSoul çağrısı entry ekranı gizliyken de çalışır, cüzdanı fetch eder
+    await readSoul();
+  }
+}
+
+// SVG çizgileri: merkez kart → her bir görünen kin kart merkezi
+function drawKinLines(overlay) {
+  const svg = overlay.querySelector('.kin-lines');
+  if (!svg) return;
+  // SVG boyutunu viewport'a ayarla
+  const rect = overlay.getBoundingClientRect();
+  svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+  svg.innerHTML = '';
+
+  const center = overlay.querySelector('.kin-center').getBoundingClientRect();
+  const cx = center.left - rect.left + center.width / 2;
+  const cy = center.top  - rect.top  + center.height / 2;
+
+  const cards = overlay.querySelectorAll('.kin-card.visible');
+  for (const card of cards) {
+    const cr = card.getBoundingClientRect();
+    const tx = cr.left - rect.left + cr.width / 2;
+    const ty = cr.top  - rect.top  + cr.height / 2;
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', cx);
+    line.setAttribute('y1', cy);
+    line.setAttribute('x2', tx);
+    line.setAttribute('y2', ty);
+    line.setAttribute('stroke', 'rgba(255,255,255,0.22)');
+    line.setAttribute('stroke-width', '1');
+    line.setAttribute('stroke-dasharray', '3 6');
+    svg.appendChild(line);
+  }
+}
+
+// Kullanıcının handle'ını çıkarmaya çalış (self-exclusion için)
+// soul.address bazen "foo.eth - bar.eth - baz.eth" formatında gelebilir;
+// bu yüzden ENS'i veya input'u saf handle olarak yakalamaya çalışırız.
+function inferUserHandle(s) {
+  if (!s) return '';
+  // Önce currentAddr (input'a yazılan) — en güvenilir
+  if (_currentAddr) return String(_currentAddr).toLowerCase().trim();
+  // Fallback: adresten ilk kelimeyi al
+  const addr = String(s.address || '').toLowerCase();
+  const first = addr.split(/\s*[-,]\s*/)[0];
+  return first.trim();
+}
+
+// Esc ile kapatma + dışına tıklayınca kapatma
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const ov = document.getElementById('kinOverlay');
+    if (ov && ov.classList.contains('visible')) closeKin();
+  }
+});
+document.addEventListener('click', (e) => {
+  const ov = document.getElementById('kinOverlay');
+  if (!ov || !ov.classList.contains('visible')) return;
+  // Overlay'ın kendisine (dış alanına) tıklandıysa kapat; içteki elemanlar hariç
+  if (e.target === ov) closeKin();
+});
 
 // ══════════════════════════════════════════════════════════
 //  SHARE TO X — mevcut ruhun paylaşılır linkiyle Twitter intent

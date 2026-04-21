@@ -741,6 +741,188 @@
     .export-opt .opt-spec  { font-size: 0.42rem; }
   }
 
+  /* ═══════════════════════════════════════════════════════════ */
+  /*  KIN OVERLAY — ruh kardeşleri haritası                      */
+  /* ═══════════════════════════════════════════════════════════ */
+  #kinOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    z-index: 600;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  #kinOverlay.visible {
+    display: block;
+    opacity: 1;
+  }
+
+  .kin-close {
+    position: absolute;
+    top: clamp(14px, 2.5vw, 24px);
+    right: clamp(14px, 2.5vw, 24px);
+    width: 36px; height: 36px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: all 0.2s;
+    z-index: 3;
+  }
+  .kin-close:hover { border-color: #fff; color: #fff; }
+
+  .kin-lines {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Merkez kart — kullanıcının kendisi */
+  .kin-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 2;
+    padding: 1.4rem 1.8rem;
+    min-width: 220px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(12, 14, 20, 0.72);
+  }
+  .kin-center-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.32em;
+    color: rgba(255, 255, 255, 0.55);
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+  }
+  .kin-center-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    letter-spacing: 0.18em;
+    line-height: 1;
+    color: #fff;
+  }
+  .kin-center-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.22em;
+    color: rgba(255, 255, 255, 0.65);
+    margin-top: 0.5rem;
+  }
+
+  /* Kin kartları — 3 slot */
+  .kin-card {
+    position: absolute;
+    width: clamp(160px, 18vw, 200px);
+    padding: 0.9rem 1rem 1rem;
+    background: rgba(12, 14, 20, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.2s;
+    text-align: center;
+    z-index: 2;
+    display: none;  /* JS ile visible yapılır, kin varsa */
+  }
+  .kin-card.visible { display: block; }
+  .kin-card:hover {
+    border-color: rgba(255, 255, 255, 0.55);
+    transform: scale(1.03);
+  }
+
+  .kin-slot-left {
+    left: clamp(16px, 6vw, 80px);
+    top: clamp(100px, 18vh, 160px);
+  }
+  .kin-slot-right {
+    right: clamp(16px, 6vw, 80px);
+    top: clamp(100px, 18vh, 160px);
+  }
+  .kin-slot-bottom {
+    bottom: clamp(24px, 6vh, 60px);
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .kin-slot-bottom:hover {
+    transform: translateX(-50%) scale(1.03);
+  }
+
+  .kin-mini {
+    display: block;
+    width: clamp(100px, 11vw, 130px);
+    height: clamp(100px, 11vw, 130px);
+    margin: 0 auto 0.6rem;
+    background: #000;
+  }
+  .kin-bond {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.54rem;
+    letter-spacing: 0.26em;
+    color: rgba(255, 255, 255, 0.48);
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+  .kin-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(0.95rem, 1.6vw, 1.15rem);
+    letter-spacing: 0.14em;
+    color: #fff;
+    line-height: 1.1;
+    margin-bottom: 0.35rem;
+  }
+  .kin-handle {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    color: rgba(255, 255, 255, 0.82);
+  }
+  .kin-addr {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.54rem;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.42);
+    margin-top: 0.25rem;
+    word-break: break-all;
+  }
+
+  /* Kin mobile (≤ 600px) — dikey stack */
+  @media (max-width: 600px) {
+    .kin-center {
+      top: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0.9rem 1.2rem;
+      min-width: 0;
+      width: calc(100% - 2.5rem);
+    }
+    .kin-card {
+      position: static;
+      width: 100%;
+      max-width: 320px;
+      margin: 0.6rem auto 0;
+      transform: none !important;
+    }
+    #kinOverlay.visible {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8rem 1rem 2rem;
+      overflow-y: auto;
+    }
+    .kin-slot-left, .kin-slot-right, .kin-slot-bottom { top: auto; bottom: auto; left: auto; right: auto; }
+    .kin-lines { display: none; }  /* mobile'da çizgileri gizle */
+  }
+
   /* Touch device: hover state'ler pürüzsüz (hover yok, tap var) */
   @media (hover: none) {
     #readBtn:hover, .export-btn:hover, .export-opt:hover,
@@ -855,6 +1037,7 @@
   <button id="perfBtn" onclick="togglePerf()">⚡ PERF MODE</button>
   <button id="exportBtn" class="export-btn" onclick="toggleExportBar()">⬇ EXPORT</button>
   <button id="shareXBtn" class="export-btn" onclick="shareSoulToX()">𝕏 SHARE</button>
+  <button id="kinBtn" class="export-btn" onclick="openKin()">◎ KIN</button>
   <a id="aboutBtn" class="export-btn rainbow-btn" href="about.html" target="_blank" rel="noopener">ⓘ ABOUT</a>
 </div>
 
@@ -885,6 +1068,40 @@
   <div class="hc-label" id="hcLabel"></div>
   <div class="hc-value" id="hcValue"></div>
   <div class="hc-desc"  id="hcDesc"></div>
+</div>
+
+<!-- KIN OVERLAY — aynı Soul Name modifier/archetype paylaşan ruh kardeşleri -->
+<div id="kinOverlay">
+  <button class="kin-close" onclick="closeKin()" aria-label="close">×</button>
+  <svg class="kin-lines" aria-hidden="true"></svg>
+
+  <div class="kin-center" id="kinCenter">
+    <div class="kin-center-label">◎ KIN</div>
+    <div class="kin-center-name" id="kinCenterName"></div>
+    <div class="kin-center-sub" id="kinCenterSub">—</div>
+  </div>
+
+  <div class="kin-card kin-slot-left" data-slot="0" onclick="visitKin(0)">
+    <canvas class="kin-mini"></canvas>
+    <div class="kin-bond"></div>
+    <div class="kin-name"></div>
+    <div class="kin-handle"></div>
+    <div class="kin-addr"></div>
+  </div>
+  <div class="kin-card kin-slot-bottom" data-slot="1" onclick="visitKin(1)">
+    <canvas class="kin-mini"></canvas>
+    <div class="kin-bond"></div>
+    <div class="kin-name"></div>
+    <div class="kin-handle"></div>
+    <div class="kin-addr"></div>
+  </div>
+  <div class="kin-card kin-slot-right" data-slot="2" onclick="visitKin(2)">
+    <canvas class="kin-mini"></canvas>
+    <div class="kin-bond"></div>
+    <div class="kin-name"></div>
+    <div class="kin-handle"></div>
+    <div class="kin-addr"></div>
+  </div>
 </div>
 
 <!-- UNBORN STATE -->
