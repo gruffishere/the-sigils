@@ -1,0 +1,40 @@
+name: Rebuild artist-index
+
+# Her gün sabah 06:00 UTC (TR 09:00) otomatik çalışır.
+# Ayrıca Actions sekmesinden "Run workflow" butonuyla manuel tetiklenebilir.
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Rebuild artist-index.json
+        run: node build-artist-index.js
+
+      - name: Commit if changed
+        run: |
+          git config user.name  "artist-index-bot"
+          git config user.email "artist-index-bot@users.noreply.github.com"
+          git add artist-index.json
+          if git diff --cached --quiet; then
+            echo "No changes in artist-index.json, skipping commit."
+          else
+            TODAY=$(date -u +%Y-%m-%d)
+            git commit -m "chore: auto-rebuild artist-index ($TODAY) [skip ci]"
+            git push
+            echo "Committed and pushed updated artist-index.json."
+          fi
