@@ -211,67 +211,116 @@ function seededPick(arr, seed) {
   return arr[(seed >>> 0) % arr.length];
 }
 
-function generateSigilName(s) {
-  if (!s) return '';
-  const addr    = s.address || 'manual';
-  const seedM   = sigilHash(addr + ':mod');
-  const seedC   = sigilHash(addr + ':core');
+// ── Dictionary pools ──────────────────────────────────────────
+// Each bucket has 4-8 variants so equal-profile wallets diverge into distinct sigils.
+// Keep pools internally consistent in tone — they get combined freely at runtime.
+const SIGIL_MODIFIERS = {
+  nakamoto:  ['Golden', 'Gilded', 'Auric'],
+  fullSet:   ['Blessed', 'Hallowed', 'Consecrated'],
+  tier8:     ['Ancient', 'Deep', 'Resonant', 'Primordial', 'Abyssal', 'Eternal', 'Vast', 'Fathomless'],
+  tier6:     ['Weighty', 'Dense', 'Ponderous', 'Gravid', 'Enduring', 'Stalwart'],
+  tier5:     ['Steadfast', 'Rooted', 'Anchored', 'Settled', 'Poised'],
+  unborn:    ['Dormant', 'Slumbering', 'Awaiting', 'Latent'],
+  rising:    ['Rising', 'Ascending', 'Climbing', 'Waxing', 'Emergent', 'Cresting'],
+  luminous:  ['Luminous', 'Radiant', 'Lustrous', 'Gleaming', 'Vivid', 'Shining', 'Glowing', 'Incandescent'],
+  amplified: ['Amplified', 'Charged', 'Boosted', 'Vibrant', 'Surging'],
+  quiet:     ['Quiet', 'Silent', 'Hushed', 'Still', 'Soft', 'Muted'],
+  modest:    ['Steady', 'Modest', 'Plain', 'Even', 'Measured', 'Temperate', 'Calm', 'Grounded'],
+};
 
-  // ── Modifier ──
-  let modifier;
-  const tier   = (typeof getSigilClass === 'function') ? (getSigilClass(s.tdh).tier || 1) : 1;
+const SIGIL_ARCHETYPES = {
+  nakamotoArtist: ['Cornerstone', 'Founding Voice', 'Prime Maker', 'Originator', 'Seed-Bearer'],
+  nakamoto:       ['Bearer', "Founder's Heir", 'Keystone', 'Titan', 'Bedrock', 'Warden'],
+  artist:         ['Maker', 'Author', 'Scribe', 'Crafter', 'Weaver', 'Forger', 'Shaper', 'Architect'],
+  fullSet:        ['Completist', 'Conservator', 'Preserver', 'Whole-Keeper'],
+  drifter:        ['Drifter', 'Wanderer', 'Walker', 'Traveler', 'Seeker', 'Rover'],
+  tdh:            ['Anchor', 'Steward', 'Pillar', 'Keeper', 'Sentinel', 'Rock'],
+  unique:         ['Curator', 'Collector', 'Archivist', 'Gatherer', 'Binder'],
+  rep:            ['Herald', 'Witness', 'Signal', 'Emissary', 'Messenger', 'Speaker'],
+  nic:            ['Voice', 'Catalyst', 'Channel', 'Nexus', 'Conduit', 'Resonator'],
+  level:          ['Adept', 'Veteran', 'Elder', 'Sage', 'Master', 'Dean'],
+};
+
+// Third word — classical "of the X" suffix, bucketed by profile signal.
+// Adds uniqueness and flavor without disturbing modifier/archetype kin logic.
+const SIGIL_SUFFIXES = {
+  nakamoto: ['of the Seize', 'of the Origin', 'of the Founding', 'of the Root', 'of First Light'],
+  fullSet:  ['of the 484', 'of the Complete', 'of the Whole', 'of the Full Measure'],
+  artist:   ['of the Hand', "of the Maker's Road", 'of the Glyph', 'of the Press', 'of the Spark'],
+  unborn:   ['of the Unseen', 'of the Uncarved', 'of the Before', 'of the Hush'],
+  general:  [
+    'of the Archive', 'of the Ledger', 'of the Long Day', 'of the Slow Burn',
+    'of the Mirror',  'of the Orbit',  'of the Horizon',  'of the Threshold',
+    'of the Veil',    'of the Spiral', 'of the Open Path','of the Current',
+    'of the Well',    'of the Signal', 'of the Quiet Hour',
+  ],
+};
+
+// ── Sigil Name pickers ────────────────────────────────────────
+// Modifier / Archetype / Suffix are picked independently (each with its own seed channel),
+// so exposing them as separate functions lets callers (KIN matching, build script)
+// work with individual components without string-splitting.
+
+function pickSigilModifier(s) {
+  if (!s) return '';
+  const seed = sigilHash((s.address || 'manual') + ':mod');
+  const tier = (typeof getSigilClass === 'function') ? (getSigilClass(s.tdh).tier || 1) : 1;
   const tdhN   = normalizeTDH(s.tdh || 0);
   const repN   = normalizeRep(s.rep || 0);
   const nicN   = normalizeNic(s.nic || 0);
   const boostN = clamp(((s.boost || 1) - 1.0) / 1.3, 0, 1);
   const levelN = clamp((s.level || 0) / 100, 0, 1);
 
-  if (s.nakamoto)                            modifier = 'Golden';
-  else if (s.fullSet)                        modifier = 'Blessed';
-  else if (tier >= 8)                        modifier = seededPick(['Ancient', 'Deep', 'Resonant'], seedM);
-  else if (tier >= 6)                        modifier = seededPick(['Deep', 'Weighty'], seedM);
-  else if (tier >= 5)                        modifier = seededPick(['Steadfast', 'Rooted'], seedM);
-  else if ((s.tdh || 0) === 0 && (s.unique || 0) === 0) modifier = 'Dormant';
-  else if (tdhN < 0.30 && (repN > 0.45 || levelN > 0.45)) modifier = 'Rising';
-  else if (repN > 0.65)                      modifier = 'Luminous';
-  else if (boostN > 0.5)                     modifier = 'Amplified';
-  else if (nicN < 0.10)                      modifier = 'Quiet';
-  else                                       modifier = seededPick(['Steady', 'Modest'], seedM);
+  if (s.nakamoto)                                       return seededPick(SIGIL_MODIFIERS.nakamoto,  seed);
+  if (s.fullSet)                                        return seededPick(SIGIL_MODIFIERS.fullSet,   seed);
+  if (tier >= 8)                                        return seededPick(SIGIL_MODIFIERS.tier8,     seed);
+  if (tier >= 6)                                        return seededPick(SIGIL_MODIFIERS.tier6,     seed);
+  if (tier >= 5)                                        return seededPick(SIGIL_MODIFIERS.tier5,     seed);
+  if ((s.tdh || 0) === 0 && (s.unique || 0) === 0)      return seededPick(SIGIL_MODIFIERS.unborn,    seed);
+  if (tdhN < 0.30 && (repN > 0.45 || levelN > 0.45))    return seededPick(SIGIL_MODIFIERS.rising,    seed);
+  if (repN > 0.65)                                      return seededPick(SIGIL_MODIFIERS.luminous,  seed);
+  if (boostN > 0.5)                                     return seededPick(SIGIL_MODIFIERS.amplified, seed);
+  if (nicN < 0.10)                                      return seededPick(SIGIL_MODIFIERS.quiet,     seed);
+  return seededPick(SIGIL_MODIFIERS.modest, seed);
+}
 
-  // ── Core archetype ──
-  let core;
-  if (s.nakamoto && s.memeArtist)
-    core = seededPick(['Cornerstone', 'Founding Voice'], seedC);
-  else if (s.nakamoto)
-    core = seededPick(['Bearer', "Founder's Heir", 'Keystone'], seedC);
-  else if (s.memeArtist)
-    core = seededPick(['Maker', 'Author', 'Scribe'], seedC);
-  else if (s.fullSet)
-    core = seededPick(['Completist', 'Conservator'], seedC);
-  else {
-    const uniN   = clamp((s.unique || 0) / 484, 0, 1);
-    const dom = [
-      ['tdh',    tdhN],
-      ['unique', uniN],
-      ['rep',    repN],
-      ['nic',    nicN],
-      ['level',  levelN],
-    ].sort((a, b) => b[1] - a[1])[0];
-    if (dom[1] < 0.08) {
-      core = seededPick(['Drifter', 'Wanderer', 'Walker'], seedC);
-    } else {
-      const archetypes = {
-        tdh:    ['Anchor', 'Steward', 'Pillar', 'Keeper'],
-        unique: ['Curator', 'Collector', 'Archivist'],
-        rep:    ['Herald', 'Witness', 'Signal'],
-        nic:    ['Voice', 'Catalyst', 'Channel'],
-        level:  ['Adept', 'Veteran', 'Elder'],
-      };
-      core = seededPick(archetypes[dom[0]] || ['Drifter'], seedC);
-    }
-  }
+function pickSigilArchetype(s) {
+  if (!s) return '';
+  const seed = sigilHash((s.address || 'manual') + ':core');
 
-  return `${modifier} ${core}`;
+  if (s.nakamoto && s.memeArtist) return seededPick(SIGIL_ARCHETYPES.nakamotoArtist, seed);
+  if (s.nakamoto)                 return seededPick(SIGIL_ARCHETYPES.nakamoto,       seed);
+  if (s.memeArtist)               return seededPick(SIGIL_ARCHETYPES.artist,         seed);
+  if (s.fullSet)                  return seededPick(SIGIL_ARCHETYPES.fullSet,        seed);
+
+  // Dominant stat → role
+  const tdhN   = normalizeTDH(s.tdh || 0);
+  const repN   = normalizeRep(s.rep || 0);
+  const nicN   = normalizeNic(s.nic || 0);
+  const levelN = clamp((s.level || 0) / 100, 0, 1);
+  const uniN   = clamp((s.unique || 0) / 484, 0, 1);
+  const dom = [
+    ['tdh', tdhN], ['unique', uniN], ['rep', repN], ['nic', nicN], ['level', levelN],
+  ].sort((a, b) => b[1] - a[1])[0];
+
+  if (dom[1] < 0.08) return seededPick(SIGIL_ARCHETYPES.drifter, seed);
+  return seededPick(SIGIL_ARCHETYPES[dom[0]] || SIGIL_ARCHETYPES.drifter, seed);
+}
+
+function pickSigilSuffix(s) {
+  if (!s) return '';
+  const seed = sigilHash((s.address || 'manual') + ':suffix');
+
+  if (s.nakamoto)  return seededPick(SIGIL_SUFFIXES.nakamoto, seed);
+  if (s.fullSet)   return seededPick(SIGIL_SUFFIXES.fullSet,  seed);
+  if (s.memeArtist) return seededPick(SIGIL_SUFFIXES.artist,  seed);
+  if ((s.tdh || 0) === 0 && (s.unique || 0) === 0) return seededPick(SIGIL_SUFFIXES.unborn, seed);
+  return seededPick(SIGIL_SUFFIXES.general, seed);
+}
+
+function generateSigilName(s) {
+  if (!s) return '';
+  return `${pickSigilModifier(s)} ${pickSigilArchetype(s)} ${pickSigilSuffix(s)}`.trim();
 }
 
 // A color dot for each parameter — the color of its orbital ring or rare form.
@@ -2098,8 +2147,8 @@ function findKin(userSigil, userHandle) {
 
   // Compute the user's Sigil Name
   const userSigilName = generateSigilName(userSigil);
-  const [userMod, ...restArr] = userSigilName.split(' ');
-  const userArch = restArr.join(' ');
+  const userMod  = pickSigilModifier(userSigil);
+  const userArch = pickSigilArchetype(userSigil);
   const userTier = (typeof getSigilClass === 'function') ? (getSigilClass(userSigil.tdh).tier || 1) : 1;
   const userTdh  = userSigil.tdh || 0;
   const exclude  = (userHandle || '').toLowerCase();
