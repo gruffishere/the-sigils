@@ -1,24 +1,34 @@
 #!/usr/bin/env node
-// Build-time artist index generator.
-// Run: node build-artist-index.js  → writes artist-index.json
+// Build-time sigil index generator.
+// Run: node build-sigil-index.js  → writes sigil-index.json
 // Requires Node 18+ (native fetch).
 //
-// Source: /api/nfts — returns all of 6529's collections (Memes + Gradient).
-// We only want "The Memes by 6529" collection; the others are filtered out.
+// Strategy (as of the "top 1420" expansion):
+//   1. Fetch the Memes NFT catalog  → builds the artist handle → cards map
+//      (so we can flag any wallet as memeArtist regardless of kin pool size).
+//   2. Fetch /api/community-members/top paginated until we have ≥ TOP_N entries.
+//   3. For each of those identities, fetch /api/tdh/consolidation/{wallet} to
+//      enrich with boost / unique / nakamoto / fullSet / consolidation_display
+//      / consolidation_wallets — fields community-members/top does not expose.
+//   4. Compute modifier/archetype/suffix/sigilName client-side and store all
+//      components in the `profiles` object (keyed by lowercased handle).
 //
-// For each artist we also fetch TDH/consolidation + profile and compute the Sigil Name.
-// The `profiles` field in artist-index.json is used for client-side KIN matching.
+// KIN pool = top TOP_N identities by TDH. Artists with low TDH that fall below
+// the cutoff are still detected via the artist handle map when their sigil is
+// viewed — they just don't appear as candidate kin for others.
 
 const fs   = require('fs');
 const path = require('path');
 
 const MEMES_COLLECTION = 'The Memes by 6529';
 const PAGE_SIZE    = 1000;
-const CHUNK_SIZE   = 5;     // parallel fetch count (kept low for rate limits)
-const CHUNK_DELAY  = 150;   // ms — wait between chunks
-const SAFETY_LIMIT = 50;    // pagination loop guard
-const RETRY_MAX    = 3;     // how many times to retry failed requests
-const RETRY_DELAY  = 400;   // ms — wait before retry (exponential)
+const TOP_N        = 1420;
+const TOP_PAGE_SIZE = 100;
+const CHUNK_SIZE   = 5;     // parallel fetches (kept low — API rate-limits aggressively)
+const CHUNK_DELAY  = 150;   // ms between chunks
+const SAFETY_LIMIT = 50;    // pagination safety loop bound
+const RETRY_MAX    = 3;
+const RETRY_DELAY  = 400;   // ms — exponential backoff base
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -27,14 +37,13 @@ async function fetchJson(url) {
   if (!r.ok) throw new Error(`HTTP ${r.status} ${url}`);
   return r.json();
 }
-// Fetch with retry — on 429/5xx it retries with increasing backoff, on 404 it stops.
+// Retry fetch — 404 returns null immediately, 429/5xx retried with exponential backoff.
 async function fetchJsonOrNull(url) {
   for (let attempt = 0; attempt < RETRY_MAX; attempt++) {
     try {
       const r = await fetch(url, { headers: { Accept: 'application/json' } });
       if (r.ok) return await r.json();
-      if (r.status === 404) return null;                 // not found → no retry
-      // 429 or 5xx → retry
+      if (r.status === 404) return null;
       await sleep(RETRY_DELAY * (attempt + 1));
     } catch {
       await sleep(RETRY_DELAY * (attempt + 1));
@@ -43,7 +52,7 @@ async function fetchJsonOrNull(url) {
   return null;
 }
 
-// ── NFT CATALOG ─────────────────────────────────────────────────
+// ── MEMES NFT CATALOG (for artist handle → card count map) ────────
 async function fetchAllMemes() {
   const all = [];
   let url = `https://api.6529.io/api/nfts?page_size=${PAGE_SIZE}`;
@@ -79,9 +88,25 @@ function collectHandleCounts(nfts) {
   return counts;
 }
 
-// ── SIGIL NAME LOGIC (must be IDENTICAL to sigil-organism.js) ──
-// We replicate these functions here so the names we compute at build time
-// exactly match the ones shown on the client.
+// ── TOP IDENTITIES (by boosted TDH) ───────────────────────────────
+async function fetchTopIdentities(targetN) {
+  const all = [];
+  let url = `https://api.6529.io/api/community-members/top?page_size=${TOP_PAGE_SIZE}`;
+  let page = 0;
+  while (url && all.length < targetN) {
+    page++;
+    process.stdout.write(`\r[top] page ${page} · ${all.length} / ${targetN}... `);
+    const d = await fetchJsonOrNull(url);
+    if (!d || !Array.isArray(d.data) || d.data.length === 0) break;
+    for (const m of d.data) all.push(m);
+    if (!d.next) break;
+    url = `https://api.6529.io/api/community-members/top?page_size=${TOP_PAGE_SIZE}&page=${page + 1}`;
+  }
+  process.stdout.write(`\r[top] ${Math.min(all.length, targetN)} identities fetched across ${page} pages\n`);
+  return all.slice(0, targetN);
+}
+
+// ── SIGIL NAME LOGIC (MUST stay in sync with sigil-organism.js) ──
 function sigilHash(value) {
   let h = 2166136261;
   const text = String(value || 'sigil');
@@ -111,18 +136,17 @@ function normalizeNic(nic) {
 }
 
 function getTier(tdh) {
-  if (tdh >= 20_000_000) return 9;  // PHENOMENON
-  if (tdh >= 15_000_000) return 8;  // LEGEND
-  if (tdh >= 10_000_000) return 7;  // MONUMENT
-  if (tdh >=  5_000_000) return 6;  // PILLAR
-  if (tdh >=  1_000_000) return 5;  // ANCHOR
-  if (tdh >=    500_000) return 4;  // RESONANCE
-  if (tdh >=    100_000) return 3;  // EMERGING
-  if (tdh >=     10_000) return 2;  // SIGNAL
-  return 1;                          // ECHO
+  if (tdh >= 20_000_000) return 9;
+  if (tdh >= 15_000_000) return 8;
+  if (tdh >= 10_000_000) return 7;
+  if (tdh >=  5_000_000) return 6;
+  if (tdh >=  1_000_000) return 5;
+  if (tdh >=    500_000) return 4;
+  if (tdh >=    100_000) return 3;
+  if (tdh >=     10_000) return 2;
+  return 1;
 }
 
-// ── Dictionary pools (MUST stay in sync with sigil-organism.js) ───
 const SIGIL_MODIFIERS = {
   nakamoto:  ['Golden', 'Gilded', 'Auric'],
   fullSet:   ['Blessed', 'Hallowed', 'Consecrated'],
@@ -219,55 +243,86 @@ function pickSigilSuffix(s) {
   return seededPick(SIGIL_SUFFIXES.general, seed);
 }
 
-function generateSigilName(s) {
-  if (!s) return '';
-  return `${pickSigilModifier(s)} ${pickSigilArchetype(s)} ${pickSigilSuffix(s)}`.trim();
-}
-
-// Some seize-handles return 404 when looked up directly on the 6529 API
-// (e.g. "gruffishere" has no match on the profile endpoint, but "gruffdzn.eth" does).
-// This map is an automation-friendly fallback layer — the build-time script reads it,
-// and new edge cases just get another line here; no manual commands required.
+// Some seize-handles return 404 on the profile endpoint (e.g. "gruffishere" has
+// no match; "gruffdzn.eth" does). Automation-friendly fallback layer.
 const SEIZE_HANDLE_FALLBACKS = {
   'gruffishere': 'gruffdzn.eth',
-  // New cases: 'seize_handle_lowercase': 'working_lookup_id',
 };
 
-// ── ARTIST PROFILE FETCH — TDH + profile + Sigil Name ─────────────
-async function fetchArtistProfile(handle, memeCount) {
-  // 3-stage lookup: direct → append .eth → custom fallback map
+// ── ARTIST WALLET MAP (handle → wallets → cards) ─────────────────
+// Memes artist_seize_handle and 6529 display handle can drift apart (e.g. a
+// meme was submitted under "gruffishere" but the current display handle on
+// 6529 is "gruff"). To detect memeArtist correctly for top-N identities we
+// also build a wallet → cards map by resolving each artist handle to its
+// consolidation wallets. Later, top-N enrichment checks both handle AND
+// wallet for a match.
+async function resolveArtistWallets(handleCount) {
+  const walletToCount = {};
+  const handles = Object.keys(handleCount);
+  let done = 0, failed = 0;
+  for (let i = 0; i < handles.length; i += CHUNK_SIZE) {
+    const chunk = handles.slice(i, i + CHUNK_SIZE);
+    await Promise.all(chunk.map(async (h) => {
+      try {
+        const count = handleCount[h] || 0;
+        let data = await fetchJsonOrNull(`https://api.6529.io/api/profiles/${encodeURIComponent(h)}`);
+        if (!data) data = await fetchJsonOrNull(`https://api.6529.io/api/profiles/${encodeURIComponent(h)}.eth`);
+        if (!data && SEIZE_HANDLE_FALLBACKS[h]) {
+          data = await fetchJsonOrNull(`https://api.6529.io/api/profiles/${encodeURIComponent(SEIZE_HANDLE_FALLBACKS[h])}`);
+        }
+        if (!data) { failed++; return; }
+        const wallets = (data.consolidation?.wallets || []).map(w => w?.wallet?.address).filter(Boolean);
+        for (const addr of wallets) {
+          const key = String(addr).toLowerCase();
+          walletToCount[key] = Math.max(walletToCount[key] || 0, count);
+        }
+        const primary = data.profile?.primary_wallet;
+        if (primary) {
+          const key = String(primary).toLowerCase();
+          walletToCount[key] = Math.max(walletToCount[key] || 0, count);
+        }
+      } catch { failed++; }
+      finally { done++; }
+    }));
+    process.stdout.write(`\r[artists] ${done}/${handles.length} resolved (${failed} failed)`);
+    if (i + CHUNK_SIZE < handles.length) await sleep(CHUNK_DELAY);
+  }
+  process.stdout.write('\n');
+  return walletToCount;
+}
+
+// ── PER-IDENTITY ENRICHMENT (rare flags from tdh/consolidation) ───
+// We already have handle / tdh / level / rep / cic from community-members/top.
+// This call adds boost / unique / nakamoto / fullSet / wallets / consolidation_display.
+async function enrichIdentity(member, memeCount) {
   async function tryLookup(id) {
-    const [td, profile] = await Promise.all([
-      fetchJsonOrNull(`https://api.6529.io/api/tdh/consolidation/${encodeURIComponent(id)}`),
-      fetchJsonOrNull(`https://api.6529.io/api/profiles/${encodeURIComponent(id)}`),
-    ]);
-    return profile ? { td, profile } : null;
+    return await fetchJsonOrNull(`https://api.6529.io/api/tdh/consolidation/${encodeURIComponent(id)}`);
   }
-
-  let result = await tryLookup(handle);
-  if (!result) result = await tryLookup(`${handle}.eth`);
-  if (!result && SEIZE_HANDLE_FALLBACKS[handle]) {
-    result = await tryLookup(SEIZE_HANDLE_FALLBACKS[handle]);
+  const handleLower = String(member.display || '').toLowerCase();
+  const wallet      = member.wallet;
+  // Prefer wallet (never 404s), fallback to handle variants
+  let td = wallet ? await tryLookup(wallet) : null;
+  if (!td) td = await tryLookup(member.display);
+  if (!td) td = await tryLookup(member.display + '.eth');
+  if (!td && SEIZE_HANDLE_FALLBACKS[handleLower]) {
+    td = await tryLookup(SEIZE_HANDLE_FALLBACKS[handleLower]);
   }
-  if (!result) return null;
+  if (!td) return null;
 
-  const { td, profile } = result;
-
-  const tdh           = td?.boosted_tdh || td?.tdh || 0;
-  const unique        = td?.unique_memes || 0;
-  const boost         = td?.boost || 1.0;
-  const fullSet       = (td?.memes_cards_sets || 0) >= 1;
-  const nakamotoCount = td?.nakamoto || 0;
-  const nakamoto      = nakamotoCount > 0;
-  const address       = td?.consolidation_display || profile.profile?.handle || handle;
-  const wallets       = (profile.consolidation?.wallets || []).map(w => w?.wallet?.address).filter(Boolean);
-  const primary       = profile.profile?.primary_wallet || null;
+  const tdh            = td?.boosted_tdh || td?.tdh || member.tdh || 0;
+  const unique         = td?.unique_memes || 0;
+  const boost          = td?.boost || 1.0;
+  const fullSet        = (td?.memes_cards_sets || 0) >= 1;
+  const nakamotoCount  = td?.nakamoto || 0;
+  const nakamoto       = nakamotoCount > 0;
+  const address        = td?.consolidation_display || member.display || wallet || handleLower;
+  const wallets        = (td?.wallets || []).filter(Boolean);
 
   const stats = {
     tdh, boost, unique, fullSet, nakamoto, nakamotoCount,
-    level:           profile.level            || 0,
-    rep:             profile.rep              || 0,
-    nic:             profile.cic?.cic_rating  || 0,
+    level:           member.level || 0,
+    rep:             member.rep || 0,
+    nic:             member.cic || 0,
     memeArtist:      memeCount > 0,
     memeArtistCount: memeCount,
     walletCount:     wallets.length || 1,
@@ -280,9 +335,9 @@ async function fetchArtistProfile(handle, memeCount) {
   const sigilName = `${modifier} ${archetype} ${suffix}`.trim();
 
   return {
-    handle: profile.profile?.handle || handle,
+    handle:         member.display,
+    primary_wallet: wallet,
     address,
-    primary_wallet: primary,
     consolidation_wallets: wallets,
     tier: getTier(tdh),
     sigilName,
@@ -293,37 +348,55 @@ async function fetchArtistProfile(handle, memeCount) {
   };
 }
 
-async function resolveArtists(handleCount) {
-  const walletCount = {};
-  const profiles    = {};                  // keyed by lowercased handle
-  const handles = Object.keys(handleCount);
+async function resolveTopIdentities(top, handleCount, artistWallets) {
+  const walletCount = { ...artistWallets };  // start with pre-resolved artist wallets
+  const profiles    = {};     // keyed by lowercased handle
   let done = 0, failed = 0, skipped = 0;
 
-  for (let i = 0; i < handles.length; i += CHUNK_SIZE) {
-    const chunk = handles.slice(i, i + CHUNK_SIZE);
-    await Promise.all(chunk.map(async (h) => {
+  for (let i = 0; i < top.length; i += CHUNK_SIZE) {
+    const chunk = top.slice(i, i + CHUNK_SIZE);
+    await Promise.all(chunk.map(async (member) => {
       try {
-        const count = handleCount[h] || 0;
-        const data  = await fetchArtistProfile(h, count);
+        const handleLower = String(member.display || '').toLowerCase();
+        // Primary: handle match. Secondary: any consolidation wallet in artistWallets.
+        // This catches identities whose display handle differs from their seize handle.
+        let memeCount = handleCount[handleLower] || 0;
+        const data = await enrichIdentity(member, memeCount);
         if (!data) { failed++; return; }
+        if (memeCount === 0) {
+          const candidates = [data.primary_wallet, ...data.consolidation_wallets].filter(Boolean);
+          for (const addr of candidates) {
+            const c = artistWallets[String(addr).toLowerCase()] || 0;
+            if (c > memeCount) memeCount = c;
+          }
+          if (memeCount > 0) {
+            // Recompute stats + sigil name with correct memeArtist flag
+            data.stats.memeArtist      = true;
+            data.stats.memeArtistCount = memeCount;
+            const seeded    = { address: data.address, ...data.stats };
+            data.modifier  = pickSigilModifier(seeded);
+            data.archetype = pickSigilArchetype(seeded);
+            data.suffix    = pickSigilSuffix(seeded);
+            data.sigilName = `${data.modifier} ${data.archetype} ${data.suffix}`.trim();
+          }
+        }
 
-        // 1) walletCount — for wallet matching (existing behavior)
+        // walletCount — merge any new artist wallets we discover
         for (const addr of data.consolidation_wallets) {
-          const key = addr.toLowerCase();
-          walletCount[key] = (walletCount[key] || 0) + count;
+          const key = String(addr).toLowerCase();
+          if (memeCount) walletCount[key] = Math.max(walletCount[key] || 0, memeCount);
         }
-        if (data.primary_wallet) {
-          const key = data.primary_wallet.toLowerCase();
-          if (!walletCount[key]) walletCount[key] = count;
+        if (data.primary_wallet && memeCount) {
+          const key = String(data.primary_wallet).toLowerCase();
+          walletCount[key] = Math.max(walletCount[key] || 0, memeCount);
         }
 
-        // 2) profiles — for KIN matching (new field)
-        // Exclude unborn artists (TDH=0 & unique=0) from the kin pool
+        // Exclude unborn (no activity) from kin pool
         const s = data.stats;
         if (s.tdh === 0 && s.unique === 0) {
           skipped++;
         } else {
-          profiles[h] = {
+          profiles[handleLower] = {
             handle:         data.handle,
             primary_wallet: data.primary_wallet,
             tier:           data.tier,
@@ -340,8 +413,8 @@ async function resolveArtists(handleCount) {
         done++;
       }
     }));
-    process.stdout.write(`\r[profiles] ${done}/${handles.length} resolved (${failed} failed, ${skipped} unborn)`);
-    if (i + CHUNK_SIZE < handles.length) await sleep(CHUNK_DELAY);
+    process.stdout.write(`\r[enrich] ${done}/${top.length} (${failed} failed, ${skipped} unborn)`);
+    if (i + CHUNK_SIZE < top.length) await sleep(CHUNK_DELAY);
   }
   process.stdout.write('\n');
   return { walletCount, profiles };
@@ -350,30 +423,42 @@ async function resolveArtists(handleCount) {
 // ── MAIN ────────────────────────────────────────────────────────
 (async function main() {
   const t0 = Date.now();
+
   console.log('[build] fetching Memes NFT catalog...');
   const nfts = await fetchAllMemes();
-
-  console.log('[build] aggregating artist handles...');
   const handleCount = collectHandleCounts(nfts);
-  console.log(`[build] ${Object.keys(handleCount).length} unique handles`);
+  console.log(`[build] ${Object.keys(handleCount).length} unique artist handles`);
 
-  console.log('[build] resolving handles → stats + Sigil Name + wallets...');
-  const { walletCount, profiles } = await resolveArtists(handleCount);
+  console.log('[build] resolving artist handles → wallets (for cross-handle detection)...');
+  const artistWallets = await resolveArtistWallets(handleCount);
+  console.log(`[build] ${Object.keys(artistWallets).length} artist wallets resolved`);
+
+  console.log(`[build] fetching top ${TOP_N} identities by TDH...`);
+  const top = await fetchTopIdentities(TOP_N);
+
+  console.log(`[build] enriching ${top.length} identities with consolidation data...`);
+  const { walletCount, profiles } = await resolveTopIdentities(top, handleCount, artistWallets);
 
   const output = {
-    lastBuild: new Date().toISOString(),
-    nftCount:  nfts.length,
-    handles:   handleCount,
-    wallets:   walletCount,
-    profiles,  // handle → { sigilName, modifier, archetype, tier, stats, ... }
+    lastBuild:   new Date().toISOString(),
+    nftCount:    nfts.length,
+    topN:        top.length,
+    handles:     handleCount,   // artist handle → Memes card count
+    wallets:     walletCount,   // wallet address → Memes card count (artists' wallets only)
+    profiles,                    // handle → { sigilName, modifier, archetype, suffix, tier, stats, ... }
   };
 
-  const outPath = path.join(__dirname, 'artist-index.json');
+  const outPath = path.join(__dirname, 'sigil-index.json');
   fs.writeFileSync(outPath, JSON.stringify(output, null, 2) + '\n', 'utf8');
 
   const dt = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`[build] done in ${dt}s → ${outPath}`);
-  console.log(`[build] ${Object.keys(handleCount).length} handles · ${Object.keys(walletCount).length} wallets · ${Object.keys(profiles).length} kin-eligible · ${nfts.length} NFTs`);
+  console.log(
+    `[build] ${Object.keys(handleCount).length} artist handles · ` +
+    `${Object.keys(walletCount).length} artist wallets · ` +
+    `${Object.keys(profiles).length} kin-eligible profiles · ` +
+    `${nfts.length} NFTs · top ${top.length}`
+  );
 })().catch(err => {
   console.error('[build] FAILED:', err);
   process.exit(1);

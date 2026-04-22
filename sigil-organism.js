@@ -1082,7 +1082,7 @@ function drawArtistBeads(ctx) {
   if (!sigil.memeArtist || count < 2) return;
 
   // Dynamic cap: use the most prolific artist in the collection as the ceiling
-  const collectionMax = (_artistIndex && _artistIndex._maxCount) || 25;
+  const collectionMax = (_sigilIndex && _sigilIndex._maxCount) || 25;
   const beadN = Math.min(collectionMax - 1, count - 1);
 
   // Parameters of the main artist ring (last entry in LAYERS)
@@ -1939,25 +1939,26 @@ function clearHoverState() {
 })();
 
 // ══════════════════════════════════════════════════════════
-//  6529 API — direct client fetch (CORS open) + build-time artist index
+//  6529 API — direct client fetch (CORS open) + build-time sigil index
 // ══════════════════════════════════════════════════════════
 const API_BASE = 'https://api.6529.io';
-let _artistIndex = null;
-async function loadArtistIndex() {
-  if (_artistIndex) return _artistIndex;
+let _sigilIndex = null;
+async function loadSigilIndex() {
+  if (_sigilIndex) return _sigilIndex;
   try {
-    const resp = await fetch('./artist-index.json');
-    if (!resp.ok) throw new Error(`artist-index HTTP ${resp.status}`);
-    _artistIndex = await resp.json();
+    const resp = await fetch('./sigil-index.json');
+    if (!resp.ok) throw new Error(`sigil-index HTTP ${resp.status}`);
+    _sigilIndex = await resp.json();
   } catch (err) {
-    console.warn('[artist-index] load failed:', err.message);
-    _artistIndex = { handles: {}, wallets: {} };
+    console.warn('[sigil-index] load failed:', err.message);
+    _sigilIndex = { handles: {}, wallets: {} };
   }
-  // Cache max card count across all artists — drives the bead cap dynamically
-  // (6529er tops the list today; if anyone passes it, rebuild the artist-index and it auto-updates)
-  const counts = Object.values(_artistIndex.handles || {});
-  _artistIndex._maxCount = counts.length ? Math.max(...counts) : 25;
-  return _artistIndex;
+  // Cache max card count across all artists — drives the bead cap dynamically.
+  // Handles map covers every Memes artist regardless of kin pool size,
+  // so this stays accurate even as the profiles pool changes.
+  const counts = Object.values(_sigilIndex.handles || {});
+  _sigilIndex._maxCount = counts.length ? Math.max(...counts) : 25;
+  return _sigilIndex;
 }
 
 async function fetchSigilFromApi(addr) {
@@ -1980,7 +1981,7 @@ async function fetchSigilFromApi(addr) {
     rep   = profileData.rep              || 0;
     nic   = profileData.cic?.cic_rating  || 0;
 
-    const idx = await loadArtistIndex();
+    const idx = await loadSigilIndex();
     const handle = profileData.profile?.handle;
     if (handle) {
       memeArtistCount = idx.handles[String(handle).toLowerCase()] || 0;
@@ -2142,8 +2143,8 @@ function drawMiniSigil(canvas, sigilLike, baseHue) {
 // Within each bucket, sorted by TDH proximity (closer sigils first).
 // The user themselves (if they are an artist) is excluded.
 function findKin(userSigil, userHandle) {
-  if (!_artistIndex || !_artistIndex.profiles) return [];
-  const profiles = _artistIndex.profiles;
+  if (!_sigilIndex || !_sigilIndex.profiles) return [];
+  const profiles = _sigilIndex.profiles;
 
   // Compute the user's Sigil Name
   const userSigilName = generateSigilName(userSigil);
@@ -2298,9 +2299,9 @@ async function openKin() {
   if (!overlay) return;
 
   // Load the data if it hasn't been loaded yet
-  await loadArtistIndex();
+  await loadSigilIndex();
 
-  // Infer the current sigil's handle (from the address via ENS or the artist-index)
+  // Infer the current sigil's handle (from the address via ENS or the sigil-index)
   // sigil.address may be messy if the API returned "consolidation_display"; we can't
   // reliably get the profile handle, so we just normalize the address for self-exclusion.
   const userHandleCandidate = inferUserHandle(sigil);

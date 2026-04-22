@@ -1,4 +1,4 @@
-name: Rebuild artist-index
+name: Rebuild sigil-index
 
 # Runs automatically every day at 06:00 UTC.
 # Can also be triggered manually from the Actions tab via "Run workflow".
@@ -22,19 +22,19 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Rebuild artist-index.json
-        run: node build-artist-index.js
+      - name: Rebuild sigil-index.json
+        run: node build-sigil-index.js
 
       - name: Commit if changed
         run: |
-          git config user.name  "artist-index-bot"
-          git config user.email "artist-index-bot@users.noreply.github.com"
-          git add artist-index.json
+          git config user.name  "sigil-index-bot"
+          git config user.email "sigil-index-bot@users.noreply.github.com"
+          git add sigil-index.json
           if git diff --cached --quiet; then
-            echo "No changes in artist-index.json, skipping commit."
+            echo "No changes in sigil-index.json, skipping commit."
           else
             TODAY=$(date -u +%Y-%m-%d)
-            git commit -m "chore: auto-rebuild artist-index ($TODAY) [skip ci]"
+            git commit -m "chore: auto-rebuild sigil-index ($TODAY) [skip ci]"
             git push
-            echo "Committed and pushed updated artist-index.json."
+            echo "Committed and pushed updated sigil-index.json."
           fi

@@ -56,16 +56,16 @@ Each tier adds a visual layer on top of previous ones — the sigil never strips
 
 ## Sigil Name
 
-Every wallet carries a two-word sigil name — a `modifier + archetype` pair, chosen deterministically from your dominant signals.
+Every wallet carries a three-part sigil name — `modifier + archetype + suffix` — chosen deterministically from your dominant signals.
 
 Examples:
-- `Golden Cornerstone` — Nakamoto holder + Memes artist
-- `Rising Maker` — early-tier artist on an upward trajectory
-- `Luminous Herald` — high REP relative to TDH
-- `Ancient Pillar` — deep, long-held identity
-- `Dormant Drifter` — wallet with no current participation
+- `Gilded Prime Maker of the Seize` — Nakamoto holder + Memes artist
+- `Rising Maker of the Spark` — early-tier artist on an upward trajectory
+- `Luminous Herald of the Archive` — high REP relative to TDH
+- `Ancient Pillar of the Ledger` — deep, long-held identity
+- `Dormant Drifter of the Unseen` — wallet with no current participation
 
-The name is shown in the top-right HUD beneath the tier.
+Names are picked from pools of ~55 modifiers, ~60 archetypes, and 33 suffixes, giving ~100k possible combinations. The name is shown in the top-right HUD beneath the tier.
 
 ---
 
@@ -85,17 +85,23 @@ Then open `http://localhost:8000`.
 
 ---
 
-## Artist index
+## Sigil index
 
-The `artist-index.json` file maps every Memes artist handle to their card count, consolidated wallets, and pre-computed sigil name. It is regenerated automatically every day at 06:00 UTC by a GitHub Actions workflow.
+The `sigil-index.json` file contains three things:
 
-Manual rebuild:
+- **`handles`** — every Memes artist handle → card count (from the full Memes NFT catalog)
+- **`wallets`** — each artist's consolidated wallets → card count (for wallet-based artist detection)
+- **`profiles`** — the top **1,420 identities** by boosted TDH, each with a pre-computed sigil name (modifier / archetype / suffix), tier, and enriched stats
+
+The profiles pool drives KIN matching — anyone visiting the app can find kin among 1,420 active 6529 souls.
+
+The index is regenerated automatically every day at 06:00 UTC by a GitHub Actions workflow. Manual rebuild:
 
 ```bash
-node build-artist-index.js
+node build-sigil-index.js
 ```
 
-Requires Node 18+ (native `fetch`). Takes ~2-3 minutes. Only the `The Memes by 6529` collection is used; other 6529 collections (Gradient etc.) are filtered out.
+Requires Node 18+ (native `fetch`). Takes ~15 minutes (1 catalog fetch + 1,420 consolidation fetches with rate-limit backoff). Only the `The Memes by 6529` collection is used for artist detection; other 6529 collections (Gradient etc.) are filtered out.
 
 ---
 
@@ -117,9 +123,9 @@ the-sigils/
 ├── about.html               manifesto + parameter reference
 ├── sigil-organism.js        all rendering, animation, API, KIN logic
 ├── wrapper.html             tiny IPFS shell (iframes the GitHub Pages URL)
-├── artist-index.json        pre-computed artist + sigil-name map
-├── build-artist-index.js    rebuilds artist-index.json
-├── .github/workflows/       daily auto-rebuild of artist-index
+├── sigil-index.json        pre-computed artist + sigil-name map
+├── build-sigil-index.js    rebuilds sigil-index.json
+├── .github/workflows/       daily auto-rebuild of sigil-index
 ├── vendor/gif.js            GIF encoder (Jnordberg)
 └── README.md
 ```
