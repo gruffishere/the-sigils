@@ -2135,45 +2135,84 @@ function drawMiniSigil(canvas, sigilLike, baseHue) {
 // ══════════════════════════════════════════════════════════
 //  KIN — artists who share the same Sigil Name modifier/archetype
 // ══════════════════════════════════════════════════════════
-// ── SOCIAL KIN — who interacts with you most on 6529 ────────────
-// Fetches /api/profile-logs?target={handle} (paginated), counts unique
-// actors, returns the top interactor whose profile exists in our pool.
-// Cached per-handle within the session to avoid re-fetching on repeat KIN opens.
+// ── SOCIAL KIN — who engages with you most on 6529 ──────────────
+// Weighted across three signals, all INBOUND to the user:
+//   • REP changes (RATING_EDIT on profile-logs) — weight 1.5
+//   • Drop raters  (top_raters on drops you authored) — weight 1.5
+//   • Drop reactions (emoji reactions on your drops)  — weight 1.0
+// Then we pick the top-scoring actor whose profile is in our kin pool.
+// Session-cached per user so repeat KIN opens are instant.
 const _socialCache = {};
 async function fetchTopSocialInteractor(userHandle) {
   if (!userHandle) return null;
-  const key = String(userHandle).toLowerCase();
-  if (_socialCache[key]) return _socialCache[key];
+  const selfKey = String(userHandle).toLowerCase();
+  if (_socialCache[selfKey]) return _socialCache[selfKey];
 
-  const counts = {};
-  const selfKeys = new Set([key]);  // exclude the user themselves
-  // Also exclude their own handle variants (sigil.handle might be different)
+  const scores    = {};     // handle → weighted score
+  const breakdown = {};     // handle → { rep, rate, reaction } for inspection
+  const bump = (h, weight, kind) => {
+    if (!h) return;
+    h = h.toLowerCase();
+    if (h === selfKey) return;
+    scores[h] = (scores[h] || 0) + weight;
+    breakdown[h] = breakdown[h] || {};
+    breakdown[h][kind] = (breakdown[h][kind] || 0) + 1;
+  };
+
+  // Signal A — REP givers (profile-logs; returns RATING_EDIT entries)
   try {
-    for (let page = 1; page <= 3; page++) {
+    for (let page = 1; page <= 2; page++) {
       const r = await fetch(`${API_BASE}/api/profile-logs?target=${encodeURIComponent(userHandle)}&page_size=100&page=${page}`);
       if (!r.ok) break;
       const j = await r.json();
       for (const l of (j.data || [])) {
-        const h = String(l.profile_handle || '').toLowerCase();
-        if (h && !selfKeys.has(h)) counts[h] = (counts[h] || 0) + 1;
+        if (l.type !== 'RATING_EDIT') continue;
+        bump(l.profile_handle, 1.5, 'rep');
       }
       if (!j.next) break;
     }
   } catch (err) {
-    console.warn('[social-kin] fetch failed:', err.message);
+    console.warn('[social-kin] profile-logs fetch failed:', err.message);
   }
 
-  // Pick the top interactor whose handle appears in our profiles pool
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  // Signals B + C — drop reactions + drop raters (user's authored drops)
+  try {
+    for (let page = 1; page <= 3; page++) {
+      const url = `${API_BASE}/api/drops?author=${encodeURIComponent(userHandle)}&limit=50&page=${page}`;
+      const r = await fetch(url);
+      if (!r.ok) break;
+      const arr = await r.json();
+      if (!Array.isArray(arr) || arr.length === 0) break;
+      for (const drop of arr) {
+        // Reactions — [{reaction: ':eyes:', profiles: [{handle, ...}, ...]}, ...]
+        for (const reactionGroup of (drop.reactions || [])) {
+          for (const prof of (reactionGroup.profiles || [])) {
+            bump(prof.handle, 1.0, 'reaction');
+          }
+        }
+        // Top raters — [{handle, ...}] (drop-level rating/vote)
+        for (const rater of (drop.top_raters || [])) {
+          const h = rater.handle || rater.profile?.handle;
+          bump(h, 1.5, 'rate');
+        }
+      }
+      if (arr.length < 50) break;
+    }
+  } catch (err) {
+    console.warn('[social-kin] drops fetch failed:', err.message);
+  }
+
+  // Pick the highest-scoring actor whose profile exists in our kin pool
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   let result = null;
-  for (const [handle, count] of sorted) {
+  for (const [handle, score] of sorted) {
     const profile = _sigilIndex?.profiles?.[handle];
     if (profile) {
-      result = { handle, profile, count };
+      result = { handle, profile, score, breakdown: breakdown[handle] };
       break;
     }
   }
-  _socialCache[key] = result;
+  _socialCache[selfKey] = result;
   return result;
 }
 
