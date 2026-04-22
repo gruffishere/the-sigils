@@ -938,6 +938,42 @@
   .kin-legend-row.kin-legend-mirror .kin-legend-label { color: #40d0ff; }   /* blue */
   .kin-legend-row.kin-legend-horizon .kin-legend-label { color: #60ff80; }  /* green */
 
+  /* Bottom-right manifesto — "What is KIN?" + short definition */
+  .kin-about {
+    position: absolute;
+    right: clamp(16px, 2.5vw, 32px);
+    bottom: clamp(20px, 4vh, 40px);
+    z-index: 3;
+    max-width: clamp(240px, 28vw, 360px);
+    text-align: right;
+    pointer-events: none;
+  }
+  .kin-about-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(0.68rem, 1.15vw, 0.82rem);
+    letter-spacing: 0.30em;
+    text-transform: uppercase;
+    background: linear-gradient(
+      var(--kin-title-angle, 90deg),
+      #ff5a5a, #ffaa30, #ffee50, #60ff80,
+      #40d0ff, #9060ff, #ff60d0, #ff5a5a
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: kinTitleShift 14s linear infinite;
+    margin-bottom: 0.6rem;
+    text-shadow: 0 0 16px rgba(255, 255, 255, 0.14);
+  }
+  .kin-about-body {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(0.58rem, 1.0vw, 0.7rem);
+    letter-spacing: 0.06em;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.62);
+  }
+
   .kin-mini {
     display: block;
     width: clamp(100px, 11vw, 130px);
@@ -1016,6 +1052,12 @@
       max-width: 100%;
       margin-top: 1rem;
       pointer-events: auto;
+    }
+    .kin-about {
+      position: static;
+      max-width: 100%;
+      margin-top: 1rem;
+      text-align: left;
     }
   }
 
@@ -1208,6 +1250,15 @@
     </div>
     <div class="kin-legend-row kin-legend-horizon">
       <span class="kin-legend-label">HORIZON</span>same path, one tier ahead — where you might go
+    </div>
+  </div>
+
+  <div class="kin-about">
+    <div class="kin-about-title">WHAT IS KIN?</div>
+    <div class="kin-about-body">
+      A map of three kindred souls, measured in data.
+      KIN traces the soul who engages with you most, the one whose numbers mirror yours, and the one walking a step ahead of your path —
+      revealing the family your sigil already quietly belongs to.
     </div>
   </div>
 </div>

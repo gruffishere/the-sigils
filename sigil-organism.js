@@ -2508,12 +2508,21 @@ async function visitKin(slotIdx) {
 
 // SVG lines: center → each kin card, tinted per bond type so the three
 // conductor lines read as three different currents (pink/blue/green).
+// An orb pulses along each line from the kin card toward the center,
+// fading in at the start and out at the end so the loop doesn't snap.
 const KIN_LINE_COLORS = {
   SOCIAL:  'rgba(255,  96, 208, 0.55)',  // pink
   MIRROR:  'rgba( 64, 208, 255, 0.55)',  // blue / cyan
   HORIZON: 'rgba( 96, 255, 128, 0.55)',  // green
 };
+const KIN_ORB_COLORS = {
+  SOCIAL:  '#ff60d0',
+  MIRROR:  '#40d0ff',
+  HORIZON: '#60ff80',
+};
 const KIN_LINE_DEFAULT = 'rgba(255, 255, 255, 0.30)';
+const KIN_ORB_DEFAULT  = '#ffffff';
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 function drawKinLines(overlay) {
   const svg = overlay.querySelector('.kin-lines');
@@ -2524,11 +2533,10 @@ function drawKinLines(overlay) {
   svg.innerHTML = '';
 
   // Use the canvas's visual center as the origin, not the text center.
-  // (The live sigil is CSS-scaled + translated; we anchor to the sigil body.)
+  // (The live sigil is CSS-scaled in KIN mode; getBoundingClientRect returns
+  // the transformed rect so its center reflects the scaled sigil's position.)
   const canvasWrap = document.getElementById('canvasWrap');
   const wrapRect = canvasWrap ? canvasWrap.getBoundingClientRect() : null;
-  // When body.kin-mode is active, the transform scales + translates canvasWrap;
-  // getBoundingClientRect returns the TRANSFORMED rect, so its center is correct.
   const cx = wrapRect
     ? wrapRect.left - rect.left + wrapRect.width / 2
     : rect.width / 2;
@@ -2537,6 +2545,7 @@ function drawKinLines(overlay) {
     : rect.height / 2;
 
   const cards = overlay.querySelectorAll('.kin-card.visible');
+  let idx = 0;
   for (const card of cards) {
     const cr = card.getBoundingClientRect();
     const tx = cr.left - rect.left + cr.width / 2;
@@ -2544,8 +2553,10 @@ function drawKinLines(overlay) {
 
     const reason = card.dataset.reason || '';
     const stroke = KIN_LINE_COLORS[reason] || KIN_LINE_DEFAULT;
+    const orbColor = KIN_ORB_COLORS[reason] || KIN_ORB_DEFAULT;
 
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    // Dashed conductor line
+    const line = document.createElementNS(SVG_NS, 'line');
     line.setAttribute('x1', cx);
     line.setAttribute('y1', cy);
     line.setAttribute('x2', tx);
@@ -2554,6 +2565,40 @@ function drawKinLines(overlay) {
     line.setAttribute('stroke-width', '1.1');
     line.setAttribute('stroke-dasharray', '3 6');
     svg.appendChild(line);
+
+    // Traveling orb — kin card → center, looping, with fade endpoints
+    // so the snap back to start is invisible.
+    const orb = document.createElementNS(SVG_NS, 'circle');
+    orb.setAttribute('cx', '0');
+    orb.setAttribute('cy', '0');
+    orb.setAttribute('r', '3.5');
+    orb.setAttribute('fill', orbColor);
+    orb.setAttribute('opacity', '0');
+    orb.setAttribute(
+      'style',
+      `filter: drop-shadow(0 0 6px ${orbColor}) drop-shadow(0 0 14px ${orbColor});`
+    );
+
+    // Stagger durations so the three orbs don't pulse in unison
+    const dur = 2.4 + idx * 0.45;
+
+    const motion = document.createElementNS(SVG_NS, 'animateMotion');
+    motion.setAttribute('dur', `${dur}s`);
+    motion.setAttribute('repeatCount', 'indefinite');
+    motion.setAttribute('path', `M ${tx} ${ty} L ${cx} ${cy}`);
+    motion.setAttribute('calcMode', 'linear');
+    orb.appendChild(motion);
+
+    const fade = document.createElementNS(SVG_NS, 'animate');
+    fade.setAttribute('attributeName', 'opacity');
+    fade.setAttribute('values', '0; 0.95; 0.95; 0');
+    fade.setAttribute('keyTimes', '0; 0.18; 0.82; 1');
+    fade.setAttribute('dur', `${dur}s`);
+    fade.setAttribute('repeatCount', 'indefinite');
+    orb.appendChild(fade);
+
+    svg.appendChild(orb);
+    idx++;
   }
 }
 
