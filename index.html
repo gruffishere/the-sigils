@@ -769,10 +769,12 @@
   body.kin-mode #topCtrls,
   body.kin-mode #zoomSlider { display: none !important; }
   body.kin-mode #canvasWrap {
-    transform: translateY(-23vh) scale(0.30);
+    transform: translateY(-24vh) scale(0.42);
     transform-origin: 50% 50%;
     transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
     pointer-events: none;
+    /* Lift visibility — low-TDH sigils get compressed hard by the scale; brightness + drop-shadow halo bring the form back */
+    filter: brightness(1.35) contrast(1.08) drop-shadow(0 0 24px rgba(255, 255, 255, 0.18));
   }
 
   .kin-close {
@@ -841,12 +843,13 @@
     z-index: 1;
   }
 
-  /* Center info — no frame, just tier + sigil name beneath the shrunken live sigil */
+  /* Center info — no frame, just tier + sigil name beneath the shrunken live sigil.
+     Position is tuned to sit just below the scaled sigil (which centers around 26vh). */
   .kin-center {
     position: absolute;
-    top: 50%;
+    top: 54%;
     left: 50%;
-    transform: translate(-50%, 10%);
+    transform: translateX(-50%);
     text-align: center;
     z-index: 2;
     pointer-events: none;
@@ -974,7 +977,7 @@
   /* Kin mobile (≤ 600px) — vertical stack */
   @media (max-width: 600px) {
     body.kin-mode #canvasWrap {
-      transform: translateY(-30vh) scale(0.28);
+      transform: translateY(-28vh) scale(0.36);
     }
     .kin-title {
       top: 1rem;
