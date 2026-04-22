@@ -2040,6 +2040,10 @@ async function fetchSigilFromApi(addr) {
     memeArtist:      memeArtistCount > 0,
     memeArtistCount,
     walletCount:     Math.max(1, walletCount),
+    // primary_wallet powers AURA kin matching (visual-signature proximity)
+    primary_wallet:  profileData?.profile?.primary_wallet
+                       || (Array.isArray(tdhData.wallets) ? tdhData.wallets[0] : null)
+                       || null,
   };
 }
 
@@ -2236,11 +2240,43 @@ async function fetchTopSocialInteractor(userHandle) {
   return result;
 }
 
+// Visual signature: the {hue, axisTilt, axisAz} triplet that renders a sigil.
+// We recompute it here from a wallet address + stats so we can compare two
+// sigils by visual similarity — the AURA kin lens.
+function sigilVisualSignature(seedSource, stats) {
+  const seed = sigilHash(
+    `${seedSource || 'manual'}:${stats.tdh || 0}:${stats.unique || 0}:${stats.boost || 1}:${stats.rep || 0}:${stats.nic || 0}`
+  );
+  const hue      = sigilHue(seedSource || 'manual');
+  const axisTilt = (((seed >>> 0) % 10000) / 10000 - 0.5) * 0.9;
+  const axisAz   = (sigilHash(seed + 333) / 0xFFFFFFFF) * Math.PI * 2;
+  return { hue, axisTilt, axisAz };
+}
+// Circular distance on the hue wheel (0-180°) normalised to 0..1
+function hueDistN(a, b) {
+  let d = Math.abs(a - b);
+  if (d > 180) d = 360 - d;
+  return d / 180;
+}
+// Circular distance on the azimuth circle (0..π) normalised to 0..1
+function azDistN(a, b) {
+  let d = Math.abs(a - b);
+  if (d > Math.PI) d = 2 * Math.PI - d;
+  return d / Math.PI;
+}
+function sigilVisualDistance(a, b) {
+  // Hue carries the most perceptual weight; tilt + azimuth shape the 3D pose.
+  return 1.5 * hueDistN(a.hue, b.hue)
+       + 0.75 * (Math.abs(a.axisTilt - b.axisTilt) / 0.9)
+       + 0.75 * azDistN(a.axisAz, b.axisAz);
+}
+
 // Three-lens selection: each kin reveals a DIFFERENT relationship to the user.
-//   Slot 1 — SOCIAL   : who interacts with you most on 6529 (profile-logs agg)
-//   Slot 2 — MIRROR   : who you are right now (closest overall stat distance)
-//   Slot 3 — HORIZON  : where you might go (same archetype, next tier up).
-//                       [Placeholder — Step 2b will replace with SIGIL signature match.]
+//   Slot 1 — SOCIAL : who engages with you most on 6529 (profile-logs + drops)
+//   Slot 2 — MIRROR : who you are right now (closest overall stat distance)
+//   Slot 3 — AURA   : your visual twin — sigils whose rotation, hue, and axis
+//                     align with yours. Matched on the seed-derived visual
+//                     signature, not stats.
 // The user themselves (if they are in the pool) is excluded.
 async function findKin(userSigil, userHandle) {
   if (!_sigilIndex || !_sigilIndex.profiles) return [];
@@ -2313,25 +2349,20 @@ async function findKin(userSigil, userHandle) {
     pickFirst(entries.filter(e => !used.has(e.handle)).sort((a, b) => a.dist - b.dist), 'MIRROR');
   }
 
-  // Slot 3 — HORIZON: same archetype, ideally next tier up.
-  //   a) exact next tier
-  //   b) any tier above user
-  //   c) same archetype any tier (might be same tier)
-  //   d) closest remaining (pure fallback)
-  const nextTier = Math.min(9, userTier + 1);
-  const horizonA = entries.filter(e => !used.has(e.handle) && e.profile.archetype === userArch && e.profile.tier === nextTier);
-  const horizonB = entries.filter(e => !used.has(e.handle) && e.profile.archetype === userArch && e.profile.tier >  userTier);
-  const horizonC = entries.filter(e => !used.has(e.handle) && e.profile.archetype === userArch);
-  const horizonD = entries.filter(e => !used.has(e.handle));
-  for (const bucket of [horizonA, horizonB, horizonC, horizonD]) {
-    if (kin.length >= 3) break;
-    const sorted = bucket.slice().sort((a, b) => {
-      // For tier-ascending buckets, prefer lower tier first (closer future)
-      const tierDiff = (a.profile.tier || 0) - (b.profile.tier || 0);
-      return tierDiff !== 0 ? tierDiff : a.dist - b.dist;
-    });
-    pickFirst(sorted, 'HORIZON');
-  }
+  // Slot 3 — AURA: visual-signature closest (hue + axis tilt + axis azimuth).
+  // Uses primary_wallet as the seed source for both sides so the comparison
+  // is apples-to-apples. Skips the already-picked SOCIAL and MIRROR kin.
+  const userSeed = userSigil.primary_wallet || userSigil.address || userHandle || 'manual';
+  const userSig  = sigilVisualSignature(userSeed, userSigil);
+  const aura = entries
+    .filter(e => !used.has(e.handle))
+    .map(e => {
+      const pSeed = e.profile.primary_wallet || e.profile.handle || e.handle;
+      const pSig  = sigilVisualSignature(pSeed, e.profile.stats || {});
+      return { ...e, visDist: sigilVisualDistance(userSig, pSig) };
+    })
+    .sort((a, b) => a.visDist - b.visDist);
+  pickFirst(aura, 'AURA');
 
   return kin;
 }
@@ -2511,14 +2542,14 @@ async function visitKin(slotIdx) {
 // An orb pulses along each line from the kin card toward the center,
 // fading in at the start and out at the end so the loop doesn't snap.
 const KIN_LINE_COLORS = {
-  SOCIAL:  'rgba(255,  96, 208, 0.55)',  // pink
-  MIRROR:  'rgba( 64, 208, 255, 0.55)',  // blue / cyan
-  HORIZON: 'rgba( 96, 255, 128, 0.55)',  // green
+  SOCIAL: 'rgba(255,  96, 208, 0.55)',  // pink
+  MIRROR: 'rgba( 64, 208, 255, 0.55)',  // blue / cyan
+  AURA:   'rgba( 96, 255, 128, 0.55)',  // green
 };
 const KIN_ORB_COLORS = {
-  SOCIAL:  '#ff60d0',
-  MIRROR:  '#40d0ff',
-  HORIZON: '#60ff80',
+  SOCIAL: '#ff60d0',
+  MIRROR: '#40d0ff',
+  AURA:   '#60ff80',
 };
 const KIN_LINE_DEFAULT = 'rgba(255, 255, 255, 0.30)';
 const KIN_ORB_DEFAULT  = '#ffffff';
