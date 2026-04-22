@@ -1289,19 +1289,33 @@ function drawConsolidationMoons(ctx) {
 // ── REP — Inbound Rays (signals flowing from outside into the REP ring) ──
 // Social capital coming to you from others; ray count scales with sqrt(rep/4M).
 // Each ray carries a bright signal dot traveling inward.
+//
+// Per-million milestone layering: every 1M rep quietly thickens the signal
+// (more rays, a second/third dot per ray, a touch more brightness) so you
+// can feel the difference between a 1M soul and an 8M soul at a glance
+// without any single visual element dominating.
 function drawRepRays(ctx) {
   const rep = sigil.rep || 0;
   if (rep <= 0) return;
 
-  const repScale  = Math.min(1, Math.sqrt(rep / 4_000_000));
-  // In perfMode the ray cap is 20 (full 50)
-  const rayCount  = 4 + Math.floor(repScale * (perfMode ? 16 : 46));
+  const repScale   = Math.min(1, Math.sqrt(rep / 4_000_000));
+  const repMillions = Math.min(8, Math.floor(rep / 1_000_000));  // 0..8 milestone tiers
+  // Base count (existing sqrt curve) + subtle tier bonus (+1 per million, capped at 8)
+  const rayCount   = 4
+                   + Math.floor(repScale * (perfMode ? 16 : 46))
+                   + (perfMode ? Math.min(4, repMillions) : repMillions);
+  // Signals traveling per ray: 1 base, +1 every 3M (so 2 dots ≥ 3M, 3 dots ≥ 6M)
+  const signalsPerRay = perfMode ? 1 : 1 + Math.min(2, Math.floor(repMillions / 3));
+  // Brightness bonus — barely-there, accumulates to ×1.32 at 8M
+  const tierBright  = 1 + repMillions * 0.04;
+
   const outerR    = FF.sigilR * 0.97;
   const innerR    = FF.sigilR * 0.66;                 // radius of the REP ring
-  const baseHue   = 110;                             // sage
-  const travelSec = 4.0;                             // signal reaches inward in 4s
+  const baseHue   = 110;                              // sage
+  const travelSec = 4.0;                              // signal reaches inward in 4s
   const focused   = (_hoveredLayerKey === 'rep' || _pinnedLayerKey === 'rep');
   const focusMul  = focused ? 1.5 : 1.0;
+  const boost     = tierBright * focusMul;
 
   // Generate ray directions via a seed-jittered Fibonacci sphere (a star pattern unique to each wallet)
   const rng = sigilRng(sigilHash(organism.seed + 607));
@@ -1333,32 +1347,36 @@ function drawRepRays(ctx) {
     // Ray line — faint on the outside, brighter toward the inner end (signal strengthening)
     const grad = ctx.createLinearGradient(pOut.x, pOut.y, pIn.x, pIn.y);
     grad.addColorStop(0,   `hsla(${hue}, 70%, 60%, 0)`);
-    grad.addColorStop(0.5, `hsla(${hue}, 85%, 70%, ${0.18 * (0.3 + depth * 0.7) * focusMul})`);
-    grad.addColorStop(1,   `hsla(${hue}, 95%, 78%, ${0.48 * (0.3 + depth * 0.7) * focusMul})`);
+    grad.addColorStop(0.5, `hsla(${hue}, 85%, 70%, ${0.18 * (0.3 + depth * 0.7) * boost})`);
+    grad.addColorStop(1,   `hsla(${hue}, 95%, 78%, ${0.48 * (0.3 + depth * 0.7) * boost})`);
     ctx.strokeStyle = grad;
-    ctx.lineWidth   = 0.7;
+    // Slightly thicker line at higher tiers (0.7 → ~0.85 at 8M)
+    ctx.lineWidth   = 0.7 + repMillions * 0.02;
     ctx.beginPath();
     ctx.moveTo(pOut.x, pOut.y);
     ctx.lineTo(pIn.x, pIn.y);
     ctx.stroke();
 
-    // Inward-traveling signal dot (0 = outer, 1 = arrival at the REP ring)
-    const travelT = ((T + ray.phase * travelSec / (Math.PI * 2)) % travelSec) / travelSec;
-    const sx = ox + (ix - ox) * travelT;
-    const sy = oy + (iy - oy) * travelT;
-    const sz = oz + (iz - oz) * travelT;
-    const pp = project3D(sx, sy, sz);
-    const r  = (0.8 + travelT * 1.6) * FF.sigilScale;
-    const a  = (0.55 + travelT * 0.35) * (0.45 + pp.depth * 0.55) * focusMul;
+    // N signal dots traveling inward, phase-offset around the cycle
+    for (let si = 0; si < signalsPerRay; si++) {
+      const travelT = ((T + ray.phase * travelSec / (Math.PI * 2)
+                         + si * travelSec / signalsPerRay) % travelSec) / travelSec;
+      const sx = ox + (ix - ox) * travelT;
+      const sy = oy + (iy - oy) * travelT;
+      const sz = oz + (iz - oz) * travelT;
+      const pp = project3D(sx, sy, sz);
+      const r  = (0.8 + travelT * 1.6) * FF.sigilScale;
+      const a  = (0.55 + travelT * 0.35) * (0.45 + pp.depth * 0.55) * boost;
 
-    const glow = ctx.createRadialGradient(pp.x, pp.y, 0, pp.x, pp.y, r * 3);
-    glow.addColorStop(0,   `hsla(${hue}, 100%, 92%, ${a})`);
-    glow.addColorStop(0.5, `hsla(${hue}, 100%, 72%, ${a * 0.45})`);
-    glow.addColorStop(1,   'transparent');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(pp.x, pp.y, r * 3, 0, Math.PI * 2);
-    ctx.fill();
+      const glow = ctx.createRadialGradient(pp.x, pp.y, 0, pp.x, pp.y, r * 3);
+      glow.addColorStop(0,   `hsla(${hue}, 100%, 92%, ${a})`);
+      glow.addColorStop(0.5, `hsla(${hue}, 100%, 72%, ${a * 0.45})`);
+      glow.addColorStop(1,   'transparent');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(pp.x, pp.y, r * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   ctx.restore();
