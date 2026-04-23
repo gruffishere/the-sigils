@@ -1133,6 +1133,29 @@
     }
   }
 
+  /* SHOWCASE TOAST — brief message shown when auto-rendering a random sigil
+     for a passive visitor (2s idle on entry screen). Centered on screen,
+     fades out quickly after the sigil starts rendering. */
+  .showcase-toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(0.68rem, 1.2vw, 0.82rem);
+    letter-spacing: 0.3em;
+    color: rgba(255, 255, 255, 0.82);
+    text-transform: lowercase;
+    pointer-events: none;
+    z-index: 1000;
+    text-align: center;
+    white-space: nowrap;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+  }
+  .showcase-toast.visible { opacity: 1; }
+
   /* ═══════════════════════════════════════════════════════════ */
   /*  ARCHIVE OVERLAY — shared table of every sigil ever read     */
   /* ═══════════════════════════════════════════════════════════ */
@@ -1386,6 +1409,9 @@
 <body>
 
 <!-- ENTRY SCREEN -->
+<!-- Showcase toast — shown briefly when the auto-showcase kicks in -->
+<div id="showcaseToast" class="showcase-toast">here's a random sigil for you</div>
+
 <div id="entry">
   <div class="entry-title">THE SIGILS</div>
   <div class="entry-sub">6529 identity portrait / by wallet</div>
@@ -1904,8 +1930,67 @@ window.addEventListener('DOMContentLoaded', () => {
   if (addr) {
     document.getElementById('walletInput').value = addr;
     readSigil();
+  } else {
+    _armShowcase();
   }
 });
+
+// ═══════════════════════════════════════════════════════
+//  SHOWCASE — auto-render a random sigil from a curated pool if the visitor
+//  stays on the entry screen for 2 seconds without typing. Catches passive
+//  visitors so the art is visible on first impression instead of an empty prompt.
+// ═══════════════════════════════════════════════════════
+
+const SHOWCASE_POOL = [
+  'punk6529', 'maybe', 'regulardad', 'blocknoob', 'david',
+  'deltasauce', 'longexposure', 'gruff', 'zigmarillion',
+  'brynnalise', 'jasonophoto',
+];
+const SHOWCASE_DELAY_MS = 2000;
+const SHOWCASE_TOAST_MS = 2200;
+
+let _showcaseTimer = null;
+let _userEngaged   = false;
+
+function _cancelShowcase() {
+  _userEngaged = true;
+  if (_showcaseTimer) { clearTimeout(_showcaseTimer); _showcaseTimer = null; }
+}
+
+function _armShowcase() {
+  if (_showcaseTimer || _userEngaged || sigil) return;
+  _showcaseTimer = setTimeout(() => {
+    _showcaseTimer = null;
+    if (_userEngaged || sigil) return;
+    const pick = SHOWCASE_POOL[Math.floor(Math.random() * SHOWCASE_POOL.length)];
+    const input = document.getElementById('walletInput');
+    if (input) input.value = pick;
+    const toast = document.getElementById('showcaseToast');
+    if (toast) {
+      toast.classList.add('visible');
+      setTimeout(() => toast.classList.remove('visible'), SHOWCASE_TOAST_MS);
+    }
+    readSigil();
+  }, SHOWCASE_DELAY_MS);
+}
+
+// Any real engagement with the entry form cancels the auto-showcase.
+(function wireShowcase() {
+  const wire = () => {
+    const input = document.getElementById('walletInput');
+    const btn   = document.getElementById('readBtn');
+    if (input) {
+      input.addEventListener('input', _cancelShowcase);
+      input.addEventListener('focus', _cancelShowcase);
+    }
+    if (btn) btn.addEventListener('click', _cancelShowcase);
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
+})();
 
 </script>
 <script src="vendor/gif.js"></script>
