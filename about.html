@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>About — The Sigils</title>
+<title>About · The Sigils</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
@@ -69,6 +69,19 @@
     padding-top: 1.5rem;
     margin-bottom: 1.1rem;
     text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+  }
+
+  /* Colored dot next to every section title */
+  .h2-dot {
+    display: inline-block;
+    width: 0.58em;
+    height: 0.58em;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 10px currentColor;
   }
 
   p {
@@ -85,13 +98,36 @@
     font-size: clamp(0.72rem, 1.25vw, 0.8rem);
   }
 
+  /* KIN screenshot */
+  .kin-img-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 1.6rem 0 0.4rem;
+  }
+  .kin-img-wrap img {
+    width: clamp(320px, 80%, 560px);
+    height: auto;
+    border-radius: 4px;
+    opacity: 0.95;
+    box-shadow: 0 0 40px rgba(255, 255, 255, 0.04);
+  }
+  .kin-img-caption {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 0.6rem;
+    margin-bottom: 1.2rem;
+  }
+
   /* Parameter list */
   .param {
     display: grid;
-    grid-template-columns: 20px 130px 1fr;
-    gap: 12px 18px;
-    align-items: baseline;
-    padding: 0.85rem 0;
+    grid-template-columns: 14px 48px 120px 1fr;
+    gap: 10px 16px;
+    align-items: center;
+    padding: 1rem 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     font-size: clamp(0.74rem, 1.3vw, 0.82rem);
   }
@@ -99,6 +135,18 @@
   .param .dot {
     width: 10px; height: 10px; border-radius: 50%;
     align-self: center;
+  }
+  .param .pmini {
+    width: 48px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .param .pmini svg {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
   .param .pkey {
     font-family: 'Bebas Neue', sans-serif;
@@ -145,6 +193,58 @@
   .tiers td.trange { color: rgba(255, 255, 255, 0.78); }
   .tiers td.tunlock { color: rgba(255, 255, 255, 0.65); }
 
+  .tier-example {
+    margin-top: 1rem;
+    padding: 0.9rem 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 2px solid rgba(255, 215, 0, 0.35);
+    font-size: clamp(0.74rem, 1.3vw, 0.82rem);
+    color: rgba(255, 255, 255, 0.78);
+  }
+  .tier-example strong {
+    color: #fff;
+    font-weight: normal;
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.15em;
+  }
+
+  /* Behind the Math */
+  .fact {
+    padding: 1rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .fact:last-of-type { border-bottom: none; }
+  .fact-title {
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.18em;
+    color: rgba(255, 255, 255, 0.96);
+    font-size: clamp(0.88rem, 1.55vw, 1rem);
+    margin-bottom: 0.4rem;
+  }
+  .fact-body {
+    color: rgba(255, 255, 255, 0.72);
+    line-height: 1.65;
+    font-size: clamp(0.76rem, 1.35vw, 0.84rem);
+  }
+
+  /* FAQ groups */
+  .faq-group {
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.25em;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.48);
+    margin: 1.6rem 0 0.8rem;
+    text-transform: uppercase;
+  }
+  .faq-group:first-of-type { margin-top: 0; }
+  section.faq p {
+    margin-bottom: 0.85rem;
+  }
+  section.faq strong {
+    color: #fff;
+    font-weight: normal;
+  }
+
   /* Credits */
   .credits {
     margin-top: 4rem;
@@ -171,12 +271,14 @@
       padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) + 24px));
     }
     .param {
-      grid-template-columns: 14px 96px 1fr;
+      grid-template-columns: 10px 36px 90px 1fr;
       gap: 8px 12px;
-      padding: 0.7rem 0;
+      padding: 0.85rem 0;
     }
     .param .dot { width: 8px; height: 8px; }
+    .param .pmini { width: 36px; height: 36px; }
     .tiers th, .tiers td { padding: 0.5rem 0.35rem; }
+    .kin-img-wrap img { width: 100%; }
   }
 </style>
 </head>
@@ -186,139 +288,391 @@
 <a class="back-link" href="/">← back to your sigil</a>
 
 <h1 class="doc-title">THE SIGILS</h1>
-<p class="doc-sub">6529 identity portrait · manifesto & anatomy</p>
+<p class="doc-sub">6529 identity portrait · manifesto &amp; anatomy</p>
 
 <section>
-  <h2>What is this?</h2>
-  <p class="lede">Every 6529 wallet carries an identity — not chosen, but accrued. Cards held, cards made, memes rated, days on the manifold, reputation earned.</p>
-  <p>The Sigils reads nine of these signals and projects them as an orbital portrait. A sun, rings, beads, threads, thorns, rays. Each wallet renders differently, deterministically — your sigil is your own.</p>
-  <p class="dim">This is not an NFT. It is a mirror.</p>
+  <h2><span class="h2-dot" style="background:hsl(42,85%,72%); color:hsl(42,85%,72%)"></span>What is The Sigils?</h2>
+  <p class="lede">Every 6529 wallet carries an identity, not chosen but accrued. Cards held, cards made, memes rated, days on the manifold, reputation earned.</p>
+  <p>The Sigils reads nine of these signals and projects them as an orbital portrait. A sun, rings, beads, threads, thorns, rays. Each wallet renders differently, deterministically, so your sigil is your own.</p>
 </section>
 
 <section>
-  <h2>How it works</h2>
-  <p>Data is pulled live from the 6529 API and refreshed every 10 minutes. As your holdings change — a new meme, a new rank, a new card — your sigil evolves.</p>
-  <p>The green dot in the corner signals live data. Click it to refresh manually. Orange means stale (API unreachable); click again to retry.</p>
-  <p class="dim">All visual parameters are derived. Nothing is random. Your wallet address seeds the axis of rotation, the orientation of rare forms, the phase of every shimmer — so no two sigils move alike.</p>
+  <h2><span class="h2-dot" style="background:conic-gradient(#ff60d0, #40d0ff, #60ff80, #ff60d0); color:rgba(255,255,255,0.4); box-shadow:0 0 10px rgba(255,255,255,0.15)"></span>What is KIN?</h2>
+  <p>KIN is your constellation of three kindred sigils, quietly chosen from the one thousand four hundred most active accounts in the 6529 archive. Three threads reach outward from your sigil, each following a different signal.</p>
+  <p><strong style="color:#40d0ff;font-weight:normal">MIRROR</strong>, your reflection in the archive. The sigil whose tier, holdings, and sigil name lie closest to your own.</p>
+  <p><strong style="color:#60ff80;font-weight:normal">AURA</strong>, your light twin. Hue, axis, and rhythm turn in time with yours, as if lit by the same lantern.</p>
+  <p><strong style="color:#ff60d0;font-weight:normal">WEAVE</strong>, the attention returning to you. Woven from reactions, ratings, and reputation. An average of the eyes looking your way.</p>
+  <p>Together they form a small network map around you. A private star chart of the people your sigil already knows. Deterministic, which means your KIN is fixed for this moment in the data. As the archive breathes and the pool refreshes each day, the constellation shifts with it.</p>
+  <div class="kin-img-wrap">
+    <img src="about-kin-punk6529.jpg" alt="punk6529's KIN constellation: MIRROR, AURA, and WEAVE threads reaching outward to three kindred sigils">
+  </div>
+  <p class="kin-img-caption">punk6529's kin</p>
 </section>
 
 <section>
-  <h2>Parameter anatomy</h2>
+  <h2><span class="h2-dot" style="background:hsl(110,70%,68%); color:hsl(110,70%,68%)"></span>How it works</h2>
+  <p>Data is pulled live from the 6529 API and refreshed every 10 minutes. As your stats change (a new meme, a new rank, a new card) your sigil evolves. The green dot in the corner signals live data. Click it to refresh manually.</p>
+  <p>All visual parameters are derived. Nothing is random. Your wallet address seeds the axis of rotation, the orientation of rare forms, the phase of every shimmer, so no two sigils move alike.</p>
+</section>
+
+<section>
+  <h2><span class="h2-dot" style="background:conic-gradient(#ff3333,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff3333); color:rgba(255,255,255,0.4); box-shadow:0 0 10px rgba(255,255,255,0.15)"></span>Parameter anatomy</h2>
 
   <div class="param">
     <span class="dot" style="background:hsl(42,85%,72%)"></span>
+    <span class="pmini">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="14" fill="none" stroke="hsl(42,85%,72%)" stroke-width="0.5" opacity="0.35"/>
+        <circle cx="24" cy="24" r="9" fill="hsl(42,90%,72%)" opacity="0.92"/>
+        <g stroke="hsl(42,85%,72%)" stroke-width="1.1" stroke-linecap="round">
+          <line x1="24" y1="2" x2="24" y2="7"/>
+          <line x1="24" y1="41" x2="24" y2="46"/>
+          <line x1="2" y1="24" x2="7" y2="24"/>
+          <line x1="41" y1="24" x2="46" y2="24"/>
+          <line x1="8.5" y1="8.5" x2="12" y2="12"/>
+          <line x1="36" y1="36" x2="39.5" y2="39.5"/>
+          <line x1="8.5" y1="39.5" x2="12" y2="36"/>
+          <line x1="36" y1="12" x2="39.5" y2="8.5"/>
+        </g>
+      </svg>
+    </span>
     <span class="pkey">TDH</span>
-    <span class="pdesc">amber sun at the center — your gravitational mass
+    <span class="pdesc">amber sun at the center with spectrum waves radiating outward. your gravitational mass.
       <em>total days held across your consolidated wallets</em></span>
   </div>
 
   <div class="param">
     <span class="dot" style="background:hsl(308,85%,72%)"></span>
+    <span class="pmini">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="20" fill="none" stroke="hsl(48,100%,70%)" stroke-width="0.9" opacity="0.75"/>
+        <circle cx="24" cy="24" r="15" fill="none" stroke="hsl(308,85%,72%)" stroke-width="2"/>
+      </svg>
+    </span>
     <span class="pkey">BOOST</span>
-    <span class="pdesc">magenta ring with a gold companion line outside
+    <span class="pdesc">magenta companion ring with a gold outer thread. your accrual amplifier.
       <em>TDH multiplier from Genesis, Gradient, OM, Full Set, and other ecosystem holdings</em></span>
   </div>
 
   <div class="param">
     <span class="dot" style="background:hsl(190,85%,72%)"></span>
+    <span class="pmini">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="17" fill="none" stroke="hsl(190,40%,35%)" stroke-width="0.5" opacity="0.35"/>
+        <g fill="hsl(190,85%,72%)">
+          <circle cx="24" cy="7" r="1.8"/>
+          <circle cx="32.5" cy="9.3" r="1.8"/>
+          <circle cx="38.7" cy="15.5" r="1.8"/>
+          <circle cx="41" cy="24" r="1.8"/>
+          <circle cx="38.7" cy="32.5" r="1.8"/>
+          <circle cx="32.5" cy="38.7" r="1.8"/>
+          <circle cx="24" cy="41" r="1.8"/>
+          <circle cx="15.5" cy="38.7" r="1.8"/>
+          <circle cx="9.3" cy="32.5" r="1.8"/>
+          <circle cx="7" cy="24" r="1.8"/>
+          <circle cx="9.3" cy="15.5" r="1.8"/>
+          <circle cx="15.5" cy="9.3" r="1.8"/>
+        </g>
+      </svg>
+    </span>
     <span class="pkey">UNIQUE</span>
-    <span class="pdesc">cyan necklace with 484 slots — each slot is a meme
-      <em>filled beads = memes you hold; empty slots = memes you don't</em></span>
+    <span class="pdesc">cyan necklace with one slot for every Memes card released.
+      <em>lit beads are the memes you hold, dark slots are the ones you don't</em></span>
   </div>
 
   <div class="param">
     <span class="dot" style="background:hsl(268,85%,72%)"></span>
+    <span class="pmini">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <g fill="hsl(268,85%,72%)">
+          <circle cx="11" cy="13" r="1.2"/>
+          <circle cx="18" cy="8" r="1.6"/>
+          <circle cx="27" cy="11" r="1"/>
+          <circle cx="35" cy="15" r="1.5"/>
+          <circle cx="39" cy="23" r="1.1"/>
+          <circle cx="36" cy="31" r="1.6"/>
+          <circle cx="29" cy="38" r="1.2"/>
+          <circle cx="20" cy="40" r="1.5"/>
+          <circle cx="11" cy="34" r="1.2"/>
+          <circle cx="8" cy="26" r="1.5"/>
+          <circle cx="22" cy="24" r="1.3"/>
+          <circle cx="28" cy="27" r="1"/>
+          <circle cx="17" cy="28" r="1.4"/>
+          <circle cx="25" cy="18" r="1.1"/>
+        </g>
+      </svg>
+    </span>
     <span class="pkey">NIC</span>
-    <span class="pdesc">lavender ring, turbulent particle field
-      <em>community interaction coefficient — who rates you, and how</em></span>
+    <span class="pdesc">lavender ring with a turbulent particle field.
+      <em>community interaction coefficient, who engages with you and how</em></span>
   </div>
 
   <div class="param">
     <span class="dot" style="background:hsl(110,70%,68%)"></span>
+    <span class="pmini">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <g stroke="hsl(110,70%,68%)" stroke-linecap="round" fill="none">
+          <line x1="24" y1="3" x2="24" y2="18" stroke-width="1" opacity="0.75"/>
+          <line x1="24" y1="45" x2="24" y2="30" stroke-width="1" opacity="0.75"/>
+          <line x1="3" y1="24" x2="18" y2="24" stroke-width="1" opacity="0.75"/>
+          <line x1="45" y1="24" x2="30" y2="24" stroke-width="1" opacity="0.75"/>
+          <line x1="7" y1="7" x2="18" y2="18" stroke-width="0.8" opacity="0.5"/>
+          <line x1="41" y1="7" x2="30" y2="18" stroke-width="0.8" opacity="0.5"/>
+          <line x1="7" y1="41" x2="18" y2="30" stroke-width="0.8" opacity="0.5"/>
+          <line x1="41" y1="41" x2="30" y2="30" stroke-width="0.8" opacity="0.5"/>
+        </g>
+        <g fill="hsl(110,95%,82%)">
+          <circle cx="24" cy="18" r="1.3"/>
+          <circle cx="24" cy="30" r="1.3"/>
+          <circle cx="18" cy="24" r="1.3"/>
+          <circle cx="30" cy="24" r="1.3"/>
+        </g>
+        <circle cx="24" cy="24" r="3.5" fill="hsl(110,90%,75%)" opacity="0.5"/>
+      </svg>
+    </span>
     <span class="pkey">REP</span>
-    <span class="pdesc">sage rays converging inward from the void
-      <em>reputation given to you by other members — signals arriving</em></span>
+    <span class="pdesc">sage rays converging inward from the void, with signal dots that stream along each ray toward your sigil. every million of reputation layers more rays and more streams.
+      <em>reputation given to you by other members</em></span>
   </div>
 
   <div class="param">
     <span class="dot" style="background:hsl(350,85%,72%)"></span>
+    <span class="pmini">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="17" fill="none" stroke="hsl(350,30%,30%)" stroke-width="2" opacity="0.35"/>
+        <path d="M 24 7 A 17 17 0 1 1 7.8 29.3" fill="none" stroke="hsl(350,85%,72%)" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+    </span>
     <span class="pkey">LEVEL</span>
-    <span class="pdesc">coral progress arc — fills to level/100
-      <em>collector level in the 6529 ecosystem, 0 to 100</em></span>
+    <span class="pdesc">coral progress arc curving along the outer edge.
+      <em>collector level in the 6529 ecosystem, zero to one hundred</em></span>
   </div>
 
   <div class="param">
     <span class="dot" style="background:hsl(155,85%,65%)"></span>
+    <span class="pmini">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="13" fill="none" stroke="hsl(155,85%,65%)" stroke-width="1.4" opacity="0.9"/>
+        <g stroke="hsl(155,85%,65%)" stroke-width="1.2" stroke-linecap="round">
+          <line x1="24" y1="11" x2="24" y2="4"/>
+          <line x1="24" y1="37" x2="24" y2="44"/>
+          <line x1="11" y1="24" x2="4" y2="24"/>
+          <line x1="37" y1="24" x2="44" y2="24"/>
+          <line x1="14.8" y1="14.8" x2="9.6" y2="9.6"/>
+          <line x1="33.2" y1="14.8" x2="38.4" y2="9.6"/>
+          <line x1="14.8" y1="33.2" x2="9.6" y2="38.4"/>
+          <line x1="33.2" y1="33.2" x2="38.4" y2="38.4"/>
+        </g>
+      </svg>
+    </span>
     <span class="pkey">FULL SET</span>
-    <span class="pdesc">teal thorny outer shell — pulses every 2 seconds
-      <em>visible only if you hold all 484 Memes cards</em></span>
+    <span class="pdesc">teal thorny outer shell that pulses every two seconds.
+      <em>visible only if you hold every Memes card released</em></span>
   </div>
 
   <div class="param">
     <span class="dot" style="background:hsl(48,100%,70%)"></span>
+    <span class="pmini">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <g transform="rotate(-22 24 24)">
+          <ellipse cx="24" cy="24" rx="19" ry="6.5" fill="none" stroke="hsl(48,100%,70%)" stroke-width="1.2"/>
+          <g fill="hsl(48,100%,76%)">
+            <circle cx="5" cy="24" r="1.5"/>
+            <circle cx="12" cy="19.6" r="1.5"/>
+            <circle cx="19" cy="17.9" r="1.5"/>
+            <circle cx="29" cy="17.9" r="1.5"/>
+            <circle cx="36" cy="19.6" r="1.5"/>
+            <circle cx="43" cy="24" r="1.5"/>
+            <circle cx="36" cy="28.4" r="1.5"/>
+            <circle cx="29" cy="30.1" r="1.5"/>
+            <circle cx="19" cy="30.1" r="1.5"/>
+            <circle cx="12" cy="28.4" r="1.5"/>
+          </g>
+        </g>
+      </svg>
+    </span>
     <span class="pkey">NAKAMOTO</span>
-    <span class="pdesc">gold bracelet on a tilted great circle — an orbiting ball travels it
+    <span class="pdesc">gold bracelet on a tilted great circle, one orbiting gold ball per Nakamoto card you hold.
       <em>visible only if you hold The Memes Card #4 (Nakamoto)</em></span>
   </div>
 
   <div class="param">
     <span class="dot" style="background:conic-gradient(#f33,#ff0,#0f0,#0ff,#00f,#f0f,#f33)"></span>
+    <span class="pmini">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <defs>
+          <linearGradient id="rainbowArtist" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stop-color="#ff3333"/>
+            <stop offset="20%"  stop-color="#ffdd00"/>
+            <stop offset="40%"  stop-color="#00ff66"/>
+            <stop offset="60%"  stop-color="#00ccff"/>
+            <stop offset="80%"  stop-color="#ff00ff"/>
+            <stop offset="100%" stop-color="#ff3333"/>
+          </linearGradient>
+        </defs>
+        <circle cx="24" cy="24" r="16" fill="none" stroke="url(#rainbowArtist)" stroke-width="2.5"/>
+        <g fill="#fff" opacity="0.92">
+          <circle cx="24" cy="8" r="2.3"/>
+          <circle cx="35.3" cy="12.7" r="2.3"/>
+          <circle cx="40" cy="24" r="2.3"/>
+          <circle cx="35.3" cy="35.3" r="2.3"/>
+        </g>
+      </svg>
+    </span>
     <span class="pkey">MEME ARTIST</span>
-    <span class="pdesc">rainbow ring with charms — one charm per card you made
+    <span class="pdesc">the rainbow ring ignites the moment you make your first card. every card beyond the first threads another iridescent pearl onto the ring.
       <em>visible only if your handle appears as artist on a Memes card</em></span>
   </div>
 
-  <p class="dim" style="margin-top: 1.2rem;">Wallet consolidation is shown as small moons orbiting the sun — one extra moon per additional wallet in your consolidation.</p>
+  <div class="param">
+    <span class="dot" style="background:hsl(0,0%,88%)"></span>
+    <span class="pmini">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="24" r="17" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.5" stroke-dasharray="1.5 2"/>
+        <circle cx="24" cy="24" r="7" fill="hsl(42,85%,72%)" opacity="0.75"/>
+        <g fill="hsl(0,0%,95%)">
+          <circle cx="41" cy="19" r="2.4"/>
+          <circle cx="9" cy="31" r="2"/>
+        </g>
+      </svg>
+    </span>
+    <span class="pkey">WALLET COUNT</span>
+    <span class="pdesc">small moons orbiting the sun, one extra moon per consolidated wallet.
+      <em>appears when your consolidation includes two or more wallets</em></span>
+  </div>
 </section>
 
 <section>
-  <h2>Tier system</h2>
+  <h2><span class="h2-dot" style="background:hsl(48,100%,70%); color:hsl(48,100%,70%)"></span>Tier system</h2>
   <p class="dim">TDH thresholds. Each tier unlocks a distinct visual signature on top of previous tiers.</p>
   <table class="tiers">
     <thead>
       <tr><th>Tier</th><th>TDH range</th><th>Unlock</th></tr>
     </thead>
     <tbody>
-      <tr><td class="tname">ECHO</td>       <td class="trange">0 – 10K</td>       <td class="tunlock">baseline</td></tr>
-      <tr><td class="tname">SIGNAL</td>     <td class="trange">10K – 100K</td>    <td class="tunlock">baseline</td></tr>
-      <tr><td class="tname">EMERGING</td>   <td class="trange">100K – 500K</td>   <td class="tunlock">+ particle density</td></tr>
-      <tr><td class="tname">RESONANCE</td>  <td class="trange">500K – 1M</td>     <td class="tunlock">+ second armillary frame</td></tr>
-      <tr><td class="tname">ANCHOR</td>     <td class="trange">1M – 5M</td>       <td class="tunlock">+ outer prestige ring</td></tr>
-      <tr><td class="tname">PILLAR</td>     <td class="trange">5M – 10M</td>      <td class="tunlock">+ sparkle density</td></tr>
-      <tr><td class="tname">MONUMENT</td>   <td class="trange">10M – 15M</td>     <td class="tunlock">+ softened vignette, aura bleeds out</td></tr>
-      <tr><td class="tname">LEGEND</td>     <td class="trange">15M – 20M</td>     <td class="tunlock">+ cosmic dust drift</td></tr>
-      <tr><td class="tname">PHENOMENON</td> <td class="trange">20M+</td>          <td class="tunlock">+ golden corona flash every 10s</td></tr>
+      <tr><td class="tname">UNBORN</td>     <td class="trange">0</td>                <td class="tunlock">no render, wallet shows "no archive found"</td></tr>
+      <tr><td class="tname">ECHO</td>       <td class="trange">&lt;10K</td>          <td class="tunlock">baseline</td></tr>
+      <tr><td class="tname">SIGNAL</td>     <td class="trange">10K to &lt;100K</td>  <td class="tunlock">baseline</td></tr>
+      <tr><td class="tname">EMERGING</td>   <td class="trange">100K to &lt;500K</td> <td class="tunlock">+ particle density</td></tr>
+      <tr><td class="tname">RESONANCE</td>  <td class="trange">500K to &lt;1M</td>   <td class="tunlock">+ second armillary frame</td></tr>
+      <tr><td class="tname">ANCHOR</td>     <td class="trange">1M to &lt;5M</td>     <td class="tunlock">+ outer prestige ring</td></tr>
+      <tr><td class="tname">PILLAR</td>     <td class="trange">5M to &lt;10M</td>    <td class="tunlock">+ sparkle density</td></tr>
+      <tr><td class="tname">MONUMENT</td>   <td class="trange">10M to &lt;15M</td>   <td class="tunlock">+ softened vignette, aura bleeds out</td></tr>
+      <tr><td class="tname">LEGEND</td>     <td class="trange">15M to &lt;20M</td>   <td class="tunlock">+ cosmic dust drift</td></tr>
+      <tr><td class="tname">PHENOMENON</td> <td class="trange">20M+</td>              <td class="tunlock">+ golden corona flash every 10s</td></tr>
     </tbody>
   </table>
+  <div class="tier-example">
+    Example: <strong>punk6529</strong> sits at tier <strong>PHENOMENON</strong> with 66M TDH, every unlock lit.
+  </div>
 </section>
 
 <section>
-  <h2>Sigil Name</h2>
-  <p>Every sigil carries a three-part name — a <em>6529 sigil name</em>, shown under your tier.</p>
-  <p>The name is a <strong style="color:#fff">modifier</strong> + an <strong style="color:#fff">archetype</strong> + a <strong style="color:#fff">suffix</strong>, chosen from your profile's dominant signals. It's deterministic: the same wallet always gets the same name, but with a dictionary of over fifty words per part, no two sigils read alike.</p>
-  <p class="dim">Examples: <em style="color:rgba(255,255,255,.75)">Golden Bearer of the Origin</em> (Nakamoto holder) · <em style="color:rgba(255,255,255,.75)">Rising Maker of the Spark</em> (early-tier artist) · <em style="color:rgba(255,255,255,.75)">Ancient Pillar of the Ledger</em> (deep TDH, long-held) · <em style="color:rgba(255,255,255,.75)">Luminous Herald of the Archive</em> (high REP) · <em style="color:rgba(255,255,255,.75)">Dormant Drifter of the Unseen</em> (fresh wallet).</p>
-  <p class="dim">Modifiers include Golden/Gilded/Auric (Nakamoto), Blessed/Hallowed (Full Set), Ancient/Primordial/Fathomless (top tiers), Steadfast/Rooted/Anchored (Anchor tier), Rising/Ascending/Waxing (early growth), Luminous/Radiant/Incandescent (high REP), Amplified/Charged/Surging (boosted), Quiet/Silent/Hushed (introverted), Dormant/Slumbering/Latent (unborn), and Steady/Modest/Grounded (default).<br>
-  Archetypes are drawn from your role: Maker/Author/Scribe/Crafter/Weaver (artists) · Bearer/Keystone/Titan/Warden (Nakamoto) · Cornerstone/Originator/Seed-Bearer (Nakamoto + artist) · Completist/Preserver/Whole-Keeper (full set) · Anchor/Pillar/Steward/Sentinel (TDH) · Curator/Archivist/Gatherer (unique) · Herald/Witness/Emissary/Speaker (REP) · Voice/Catalyst/Nexus/Conduit (NIC) · Adept/Sage/Elder/Master (level) · Drifter/Wanderer/Seeker/Pilgrim (balanced).<br>
-  Suffixes root the name in place: <em>of the Origin</em> (Nakamoto), <em>of the 484</em> (full set), <em>of the Hand</em> (artist), <em>of the Unseen</em> (unborn), or one of fifteen general lines — <em>of the Archive</em>, <em>of the Long Day</em>, <em>of the Horizon</em>, <em>of the Spiral</em>, and others.</p>
+  <h2><span class="h2-dot" style="background:hsl(308,85%,72%); color:hsl(308,85%,72%)"></span>Sigil Name</h2>
+  <p>Every sigil carries a three-part name, a <em>6529 sigil name</em>, shown under your tier.</p>
+  <p>The name is a <strong style="color:#fff">modifier</strong> plus an <strong style="color:#fff">archetype</strong> plus a <strong style="color:#fff">suffix</strong>, chosen deterministically from your profile's dominant signals. The same wallet always gets the same name. With over fifty words per part, no two sigils read alike.</p>
+  <p class="dim">Examples: <em style="color:rgba(255,255,255,.75)">Golden Bearer of the Origin</em> (Nakamoto holder) · <em style="color:rgba(255,255,255,.75)">Rising Maker of the Spark</em> (early tier artist) · <em style="color:rgba(255,255,255,.75)">Ancient Pillar of the Ledger</em> (deep TDH) · <em style="color:rgba(255,255,255,.75)">Luminous Herald of the Archive</em> (high REP) · <em style="color:rgba(255,255,255,.75)">Dormant Drifter of the Unseen</em> (fresh wallet).</p>
+  <div class="tier-example" style="border-left-color: rgba(255, 96, 208, 0.4)">
+    Example: <strong>punk6529</strong> renders as <strong>Gilded Prime Maker of the Seize</strong>, tier PHENOMENON.
+  </div>
 </section>
 
 <section>
-  <h2>Reading your sigil</h2>
-  <p>Hover any ring (or tap on mobile) to see what it is, what value it carries, and what it means.</p>
-  <p>The tier name, memetic score, and TDH appear top-right. The nine base parameters are listed bottom-left; the ring color legend bottom-right.</p>
-  <p class="dim">Scroll with your mouse or drag the side slider to zoom. Axis of rotation is seeded by your wallet — no two sigils tilt alike.</p>
+  <h2><span class="h2-dot" style="background:hsl(190,85%,72%); color:hsl(190,85%,72%)"></span>Behind the math</h2>
+  <p class="dim">A few things happening under the surface, for the curious.</p>
+
+  <div class="fact">
+    <div class="fact-title">Drawn from math, not images</div>
+    <div class="fact-body">There is not a single texture, photograph, 3D model, or pre-rendered frame in The Sigils. Every pearl, every ring, every particle of cosmic dust is drawn fresh on a blank canvas sixty times a second, from equations alone. What you are looking at is pure computation, recomputed every frame your eye receives.</div>
+  </div>
+
+  <div class="fact">
+    <div class="fact-title">No random() calls anywhere</div>
+    <div class="fact-body">Every shimmer, tilt, dot pattern, and timing is derived mathematically from your wallet address. Run the same wallet tomorrow, next year, or on another device, and every detail lines up identically.</div>
+  </div>
+
+  <div class="fact">
+    <div class="fact-title">Your wallet is a palette</div>
+    <div class="fact-body">The first six hex digits of your wallet address convert directly into a hue on the color wheel. A wallet starting with <code style="color:#60ff80">0x00FF00</code> will render with a green heart. One starting with <code style="color:#ff60d0">0xFF00FF</code> a magenta one. Your address is already your signature color before a single pixel is drawn.</div>
+  </div>
+
+  <div class="fact">
+    <div class="fact-title">Musical harmonic timing</div>
+    <div class="fact-body">Every animation in your sigil is a musical ratio of the 30 second master loop. Rotation is the whole note, chroma shimmer the half, ring dots a triplet, breath a quarter, Nakamoto pearl a 2.5, sparkle an eighth. Your sigil is, quite literally, a quiet composition.</div>
+  </div>
+
+  <div class="fact">
+    <div class="fact-title">NIC is a curl noise field, REP adds magnetic poles</div>
+    <div class="fact-body">The turbulent particle drift you see is a two dimensional Perlin noise field, sampled as a vector field. When your REP crosses a threshold, magnetic poles appear inside the field, and the particles swirl around them like iron filings. It is not decorative motion. It is fluid dynamics.</div>
+  </div>
+
+  <div class="fact">
+    <div class="fact-title">REP rays follow a square root curve</div>
+    <div class="fact-body">Going from one million to four million reputation doesn't quadruple your rays, it doubles them. The perception of recognition grows with diminishing returns, just the way it feels in practice.</div>
+  </div>
+
+  <div class="fact">
+    <div class="fact-title">Fibonacci star field</div>
+    <div class="fact-body">REP rays spread across a Fibonacci sphere using the golden angle (π × (3 − √5)). Your star pattern feels evenly scattered, but no two wallets ever render the same field.</div>
+  </div>
+
+  <div class="fact">
+    <div class="fact-title">Tier bonus starlight</div>
+    <div class="fact-body">Every tier above RESONANCE adds fifty extra "star" particles to your field, each with its own halo and full spectrum hue. A MONUMENT sigil carries three hundred and fifty more individual points of light than an EMERGING sigil, drawn frame by frame.</div>
+  </div>
+
+  <div class="fact">
+    <div class="fact-title">108,900 possible names, yours forever fixed</div>
+    <div class="fact-body">55 modifiers × 60 archetypes × 33 suffixes = 108,900 possible sigil names. Your wallet address hash picks exactly one, and it never moves unless a threshold is crossed.</div>
+  </div>
+
+  <div class="fact">
+    <div class="fact-title">KIN is a 3 way match across 3 signals</div>
+    <div class="fact-body">The chance of two wallets sharing the exact same MIRROR, AURA, and WEAVE picks out of 1,400 candidates is roughly one in a few billion. Your KIN is, for practical purposes, unique.</div>
+  </div>
 </section>
 
-<section>
-  <h2>FAQ</h2>
-  <p><strong style="color:#fff">Does my sigil change over time?</strong><br>
+<section class="faq">
+  <h2><span class="h2-dot" style="background:hsl(268,85%,72%); color:hsl(268,85%,72%)"></span>FAQ</h2>
+
+  <div class="faq-group">Your sigil</div>
+
+  <p><strong>Does my sigil change over time?</strong><br>
   Yes. As your TDH, REP, holdings, or artist credits change, your sigil evolves with the next refresh.</p>
-  <p><strong style="color:#fff">I'm a Memes artist but no rainbow ring shows up?</strong><br>
-  Your handle in the 6529 profile may differ from the one credited on the card. Wallet-based matching usually catches this; if not, data may be stale in the public API.</p>
-  <p><strong style="color:#fff">Can I export my sigil?</strong><br>
-  Yes — PNG (still), GIF (12s loop, Twitter-safe), or MP4 (15s, full quality). Use the EXPORT button.</p>
-  <p><strong style="color:#fff">Is this an NFT or collection?</strong><br>
-  Not today. It's a free tool for the community, a mirror. What comes next is a conversation for the community to have.</p>
+
+  <p><strong>Does perf mode change my sigil's identity?</strong><br>
+  No. Perf mode only drops particle count, halos, and some shimmer math. Your axis, your name, your tier, every bead and pearl stay exactly the same.</p>
+
+  <p><strong>Why does my sigil look different on another screen?</strong><br>
+  The colors are HSL based and render at native pixel density. Deeper panels and HDR displays show more saturated amber, sage, and rainbow than low gamut phone screens.</p>
+
+  <p><strong>Can my sigil disappear?</strong><br>
+  Only if your TDH and your unique Memes both fall to zero, which is the UNBORN state. One meme on your wallet is enough to keep your sigil drawn.</p>
+
+  <p><strong>Why is my sigil different from someone with almost identical stats?</strong><br>
+  Because the axis of rotation, the placement of rare forms, and every shimmer phase are seeded by your wallet address. Two wallets will never tilt alike.</p>
+
+  <div class="faq-group">Your KIN</div>
+
+  <p><strong>My KIN looks empty, why?</strong><br>
+  You may not be in the pool of the top 1,400 accounts by boosted TDH, or your profile may not carry enough signal for all three lenses yet.</p>
+
+  <p><strong>How is the KIN pool chosen?</strong><br>
+  The top 1,400 accounts by boosted TDH, refreshed automatically every morning.</p>
+
+  <p><strong>Will my KIN change?</strong><br>
+  Yes. Both as the pool refreshes each day and as your own stats evolve.</p>
+
+  <p><strong>Can two wallets share the same KIN?</strong><br>
+  Practically never. Matching across MIRROR, AURA, and WEAVE out of 1,400 candidates lands in one in billions territory.</p>
+
+  <div class="faq-group">Exports &amp; data</div>
+
+  <p><strong>Can I export my sigil?</strong><br>
+  Yes. PNG (still, 1080²), GIF (540², 12 fps, 12 seconds, seamless loop), or MP4 (native pixels, 30 fps, 15 seconds, 8 Mbps). Use the EXPORT button.</p>
+
+  <p><strong>Does my wallet data leave my browser?</strong><br>
+  Only a read only request to the public 6529 API. Nothing is stored, nothing is tracked.</p>
 </section>
 
 <div class="credits">
