@@ -172,7 +172,13 @@ function renderSigil(data) {
 
   const entry = document.getElementById('entry');
   entry.classList.add('fade-out');
-  setTimeout(() => { entry.style.display = 'none'; }, 800);
+  setTimeout(() => {
+    entry.style.display = 'none';
+    // Safety net for mobile Safari: by the time the entry screen fades out, the
+    // URL bar has usually collapsed. Force a resize so the canvas rebuilds for
+    // the new (taller) viewport and the sigil lands dead center.
+    if (typeof resize === 'function') resize();
+  }, 800);
 
   document.getElementById('canvasWrap').style.display = 'block';
   document.getElementById('hud').style.display        = 'block';
@@ -546,9 +552,11 @@ function buildVisuals() {
     scale:         lerp(0.0022, 0.0060, 1 - tdhN),
     // Base particles are like crystal dust (baseHue-based, small).
     // Tier-bonus particles sparkle in star mode (full spectrum, with halo).
-    // perfMode: drops the base cap and star particles (the biggest perf win)
-    baseParticleCount: Math.floor(lerp(180, perfMode ? 220 : 620, tdhN)),
-    starParticleCount: perfMode ? 0 : Math.max(0, tier - 2) * 50,
+    // perfMode: drops the base cap and star particles (the biggest perf win).
+    // Mobile HQ is scaled ~55-60% of desktop HQ — iPhones still get the "richer"
+    // look but avoid the alpha-blend overload that used to show up as a bright blob.
+    baseParticleCount: Math.floor(lerp(180, perfMode ? 220 : (isMobile ? 360 : 620), tdhN)),
+    starParticleCount: perfMode ? 0 : Math.max(0, tier - 2) * (isMobile ? 26 : 50),
     get particleCount() { return this.baseParticleCount + this.starParticleCount; },
 
     // Tier info — draw functions use it for unlocks

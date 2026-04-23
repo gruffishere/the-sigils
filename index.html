@@ -1027,52 +1027,68 @@
     word-break: break-all;
   }
 
-  /* Kin mobile (≤ 600px) — vertical stack */
+  /* Kin mobile (≤ 600px) — vertical stack with scroll.
+     The big sigil is hidden on mobile KIN: it lives in #canvasWrap as position:fixed,
+     so it wouldn't scroll with the overlay and would collide with every card.
+     Tier + name at the top plus the three kin cards' own mini sigils carry the identity. */
   @media (max-width: 600px) {
-    body.kin-mode #canvasWrap {
-      transform: scale(0.36);
-    }
-    .kin-title {
-      top: 1rem;
-      font-size: 0.6rem;
-      letter-spacing: 0.22em;
-    }
-    .kin-center {
-      top: auto;
-      bottom: auto;
-      position: static;
-      transform: none;
-      margin: 0 auto 1rem;
-      padding-top: 2.5rem;
-      max-width: 100%;
-    }
-    .kin-card {
-      position: static;
-      width: 100%;
-      max-width: 320px;
-      margin: 0.6rem auto 0;
-      transform: none !important;
+    body.kin-mode #canvasWrap { display: none; }
+    /* Overlay itself must accept touch so the user can scroll — default is pointer-events:none. */
+    #kinOverlay {
+      pointer-events: auto;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
     #kinOverlay.visible {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      padding: 5rem 1rem 2rem;
-      overflow-y: auto;
+      align-items: stretch;
+      padding: 4.2rem 1.1rem 2rem;
     }
-    .kin-slot-left, .kin-slot-right, .kin-slot-bottom { top: auto; bottom: auto; left: auto; right: auto; }
-    .kin-lines { display: none; }  /* hide the lines on mobile */
+    .kin-close {
+      position: fixed;
+      top: max(0.9rem, env(safe-area-inset-top, 0px));
+      right: 0.9rem;
+    }
+    /* Title sticks to the top through scroll — otherwise it would scroll away. */
+    .kin-title {
+      position: fixed;
+      top: max(1rem, env(safe-area-inset-top, 0px));
+      font-size: 0.6rem;
+      letter-spacing: 0.22em;
+    }
+    .kin-center {
+      position: static;
+      transform: none;
+      margin: 0.4rem auto 1.4rem;
+      max-width: 100%;
+      text-align: center;
+    }
+    .kin-card {
+      position: static;
+      width: 100%;
+      max-width: 340px;
+      margin: 0.55rem auto;
+      transform: none !important;
+    }
+    .kin-slot-left, .kin-slot-right, .kin-slot-bottom {
+      top: auto; bottom: auto; left: auto; right: auto;
+    }
+    /* SVG lines don't make sense on the vertical stack — hide them. */
+    .kin-lines { display: none; }
     .kin-legend {
       position: static;
       max-width: 100%;
-      margin-top: 1rem;
+      margin: 1.6rem auto 0;
       pointer-events: auto;
     }
     .kin-about {
       position: static;
       max-width: 100%;
-      margin-top: 1rem;
+      margin: 1.5rem auto 1rem;
       text-align: left;
+      right: auto;
+      bottom: auto;
     }
   }
 
@@ -1662,7 +1678,10 @@ function resize() {
   const H = window.innerHeight;
   // On Retina / high-DPR screens, multiply the internal buffer by the pixel density
   // while keeping CSS size logical. This fixes the blur on iPhone.
-  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  // Mobile is capped tighter (2.0) — iPhone 14 Pro etc report dpr 3, but at 2.0 the
+  // image is still perfectly sharp on a phone screen and we save ~36% GPU vs 2.5.
+  const mobileHere = window.innerWidth < 600;
+  const dpr = Math.min(window.devicePixelRatio || 1, mobileHere ? 2.0 : 2.5);
   window._dpr = dpr;
   [c1, c2, c3].forEach(c => {
     c.width  = Math.round(W * dpr);
@@ -1677,6 +1696,18 @@ function resize() {
 }
 
 window.addEventListener('resize', resize);
+// iOS Safari collapses the URL bar after first interaction, which changes the
+// visual viewport without firing window.resize. Without this listener the canvas
+// stays sized to the initial (URL-bar-visible) viewport and the sigil lands
+// off-center. visualViewport.resize catches those cases.
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', resize);
+}
+// Orientation change on mobile fires late on some browsers; force a resize
+// after the browser has settled (300ms covers most devices).
+window.addEventListener('orientationchange', () => {
+  setTimeout(resize, 300);
+});
 resize();
 
 // ═══════════════════════════════════════════════════════
