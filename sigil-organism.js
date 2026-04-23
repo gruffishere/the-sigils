@@ -2702,8 +2702,11 @@ function shareSigilToX() {
 }
 
 // ══════════════════════════════════════════════════════════
-//  EXPORT — GIF (540×540 / 12fps / 12s) + MP4 (720×720 / 15fps / 15s)
+//  EXPORT — GIF (540×540 / 12fps / 12s) + MP4 (≤1080² / 60fps / 30s)
 //  Both formats seamlessly loop with exactly one rotY turn.
+//  MP4 duration now matches the 30s master loop at 60fps to mirror
+//  the live viewing experience (previously 15s / 30fps, which felt
+//  2× too fast and noticeably choppy).
 //  Only the canvas is captured (HUD DOM overlay not included).
 // ══════════════════════════════════════════════════════════
 
@@ -2888,8 +2891,10 @@ async function exportSigilGif() {
   }
 }
 
-// ── MP4 EXPORT — full quality from the site (native pixels, 30fps, 8Mbps) ──
+// ── MP4 EXPORT — full quality from the site (native pixels, 60fps, 16Mbps) ──
 // MediaRecorder API. Falls back to WebM when MP4 isn't supported (Firefox is usually WebM).
+// 60fps + 30s duration = 1800 frames. Matches the 30s master animation loop exactly,
+// so the recorded motion is identical to what the user sees live on screen.
 async function exportSigilMp4() {
   if (!sigil) return;
   if (typeof MediaRecorder === 'undefined') {
@@ -2922,9 +2927,9 @@ async function exportSigilMp4() {
   const Hlog2  = FF.logicalH || window.innerHeight;
   const physMin = Math.min(Wlog2, Hlog2) * dprMp4;
   const EXPORT_SIZE = Math.min(Math.round(physMin), 1080);
-  const FPS         = 30;
-  const DURATION    = 15;
-  const FRAME_COUNT = FPS * DURATION;  // 450 frames
+  const FPS         = 60;                  // mirrors the live 60Hz refresh feel
+  const DURATION    = 30;                  // full master loop — live rotY cadence (not 2× faster)
+  const FRAME_COUNT = FPS * DURATION;      // 1800 frames
 
   const state = beginSigilCapture();
 
@@ -2941,7 +2946,7 @@ async function exportSigilMp4() {
   const stream   = off.captureStream(FPS);
   const recorder = new MediaRecorder(stream, {
     mimeType:            picked.mime,
-    videoBitsPerSecond:  8_000_000,   // 8 Mbps — premium, preserves gradient detail
+    videoBitsPerSecond:  16_000_000,  // 16 Mbps — twice the old rate, matches the doubled fps
   });
 
   const chunks = [];

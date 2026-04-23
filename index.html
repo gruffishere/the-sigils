@@ -1028,11 +1028,18 @@
   }
 
   /* Kin mobile (≤ 600px) — vertical stack with scroll.
-     The big sigil is hidden on mobile KIN: it lives in #canvasWrap as position:fixed,
-     so it wouldn't scroll with the overlay and would collide with every card.
-     Tier + name at the top plus the three kin cards' own mini sigils carry the identity. */
+     The big sigil used to collide with every card because #canvasWrap is position:fixed.
+     Instead of hiding it outright, leave it blurred and dim behind the content — a soft
+     halo that recalls the live sigil without fighting for attention. Cards scroll on top. */
   @media (max-width: 600px) {
-    body.kin-mode #canvasWrap { display: none; }
+    body.kin-mode #canvasWrap {
+      display: block;
+      transform: scale(0.5);
+      transform-origin: 50% 50%;
+      opacity: 0.24;
+      filter: blur(10px) brightness(1.2);
+      pointer-events: none;
+    }
     /* Overlay itself must accept touch so the user can scroll — default is pointer-events:none. */
     #kinOverlay {
       pointer-events: auto;
@@ -1469,7 +1476,7 @@
     <span class="opt-label">GIF</span><span class="opt-spec">540² · 12fps · 12s</span>
   </button>
   <button class="export-opt" onclick="exportSigilMp4()">
-    <span class="opt-label">MP4</span><span class="opt-spec">1080² · 30fps · 15s</span>
+    <span class="opt-label">MP4</span><span class="opt-spec">1080² · 60fps · 30s</span>
   </button>
 </div>
 
