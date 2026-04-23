@@ -1,5 +1,4 @@
 # THE SIGILS
-### A mirror, not a score.
 
 Every 6529 wallet carries an identity — not chosen, but accrued. **The Sigils** reads your on-chain identity and renders it as a living orbital sigil. Every tier walks with dignity. Every maker shines first. Deterministic, yet no two sigils dance alike.
 
@@ -146,4 +145,4 @@ Any change pushed to `main` redeploys Pages automatically. The IPFS CID stays st
 Built by [gruffdzn.eth](https://6529.io/gruffishere).
 Data from the 6529 API.
 
-A mirror, not a score. A love letter to The Memes.
+A love letter to The Memes.
