@@ -2931,6 +2931,20 @@ async function exportSigilMp4() {
   const DURATION    = 30;                  // full master loop — live rotY cadence (not 2× faster)
   const FRAME_COUNT = FPS * DURATION;      // 1800 frames
 
+  // For consistent smoothness across every sigil, force PERF MODE during the export.
+  // Why: MediaRecorder + canvas.captureStream sample at wall-clock 60fps. If our offscreen
+  // render can't finish a frame in ≤16ms (likely on high-tier sigils with 900+ particles),
+  // the stream duplicates the last frame — the output looks choppy even though the file
+  // claims 60fps. PERF MODE drops particle count so every sigil renders in under a frame.
+  // Rings, core, rays, rare forms (Nakamoto, FullSet, rainbow, moons, spectrum waves) all
+  // stay at full detail; only the ambient particle atmosphere thins. For a single high-
+  // detail frame, PNG export is the correct tool.
+  const savedPerfMode = perfMode;
+  if (!perfMode) {
+    perfMode = true;
+    buildVisuals();    // regenerate FF + particles at perf settings
+  }
+
   const state = beginSigilCapture();
 
   const off    = document.createElement('canvas');
@@ -2979,6 +2993,7 @@ async function exportSigilMp4() {
     await stoppedPromise;
 
     endSigilCapture(state);
+    restoreExportPerfMode(savedPerfMode);
 
     const blob = new Blob(chunks, { type: picked.mime });
     downloadSigilBlob(blob, picked.ext);
@@ -2988,7 +3003,20 @@ async function exportSigilMp4() {
     console.error('MP4 export failed:', err);
     try { recorder.stop(); } catch {}
     endSigilCapture(state);
+    restoreExportPerfMode(savedPerfMode);
     btn.classList.remove('busy');
     btn.textContent = '⬇ EXPORT';
   }
+}
+
+// Restore perf mode after a forced-perf export. If we toggled it off, rebuild visuals
+// cleanly so the live view returns to HQ without visible particle duplication.
+function restoreExportPerfMode(savedPerfMode) {
+  if (perfMode === savedPerfMode) return;
+  if (animId) cancelAnimationFrame(animId);
+  animId = null;
+  perfMode = savedPerfMode;
+  buildVisuals();          // rebuilds FF + particles in the saved (HQ) mode
+  lastTs = 0;
+  animate(performance.now());
 }
