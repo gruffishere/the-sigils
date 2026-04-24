@@ -2922,23 +2922,62 @@ async function exportSigilMp4() {
 // ── WebCodecs path ────────────────────────────────────────
 // Frames are encoded with timestamps derived from their index, not wall-clock,
 // so the output is a perfect 30s/60fps clip every time regardless of render speed.
-// That means we DON'T need to force perf mode — we respect whatever mode the user
-// is in. PERF live view → PERF video. HQ live view → HQ video. Complex sigils in
-// HQ just make the user wait longer; the output file is identical in duration
-// and framerate to a simple sigil.
+// Desktop respects the user's current mode. Mobile forces perf mode for stability
+// (see forcedPerf comment below).
 async function exportSigilMp4WebCodecs(btn) {
   btn.classList.add('busy');
+
+  const isMobileEnc = window.innerWidth < 600;
 
   const dprMp4 = window._dpr || 1;
   const Wlog2  = FF.logicalW || window.innerWidth;
   const Hlog2  = FF.logicalH || window.innerHeight;
   const physMin = Math.min(Wlog2, Hlog2) * dprMp4;
-  // H.264 encoders require even dimensions.
-  const EXPORT_SIZE = Math.min(Math.round(physMin), 1080) & ~1;
+  // H.264 encoders require even dimensions. Mobile gets a 720² cap (from 1080²):
+  // phone hardware encoders on non-Pro chips choke at 1080² and the ArrayBufferTarget
+  // doesn't blow past the tab-memory ceiling.
+  const maxSize = isMobileEnc ? 720 : 1080;
+  const EXPORT_SIZE = Math.min(Math.round(physMin), maxSize) & ~1;
   const FPS         = 60;
   const DURATION    = 30;
-  const FRAME_COUNT = FPS * DURATION;      // 1800 frames
+  const FRAME_COUNT = FPS * DURATION;
   const FRAME_DURATION_US = Math.round(1_000_000 / FPS);
+  // Mobile bitrate halved — desktop stays at 16 Mbps premium.
+  const BITRATE = isMobileEnc ? 6_000_000 : 16_000_000;
+
+  // Codec support probe BEFORE any side effects. iOS Safari has accepted
+  // avc1.42001f (Baseline 3.1) since 16.4, but some device / OS combos still
+  // reject it. Baseline 3.0 is the most conservative H.264 profile and is
+  // accepted everywhere the H.264 decoder exists. If both fail, we fall back
+  // to MediaRecorder.
+  let chosenCodec = null;
+  try {
+    for (const codec of ['avc1.42001f', 'avc1.42001e']) {
+      const probe = { codec, width: EXPORT_SIZE, height: EXPORT_SIZE, bitrate: BITRATE, framerate: FPS };
+      const support = await VideoEncoder.isConfigSupported(probe);
+      if (support && support.supported) { chosenCodec = codec; break; }
+    }
+  } catch (err) {
+    console.warn('[mp4] isConfigSupported failed:', err);
+  }
+  if (!chosenCodec) {
+    console.warn('[mp4] no supported H.264 config on this device — MediaRecorder fallback');
+    btn.classList.remove('busy');
+    return exportSigilMp4MediaRecorder(btn);
+  }
+
+  // Force perf mode on MOBILE only. The video duration is fixed either way, but
+  // a slow HQ render on a phone pushes total wall-clock time past a minute or two,
+  // which invites the user to background the tab — at which point iOS Safari
+  // suspends JS and the encode dies silently. Perf mode keeps render comfortably
+  // under one frame's budget, cutting total wait by roughly half. Desktop HQ
+  // stays HQ.
+  const savedPerfMode = perfMode;
+  const forcedPerf = isMobileEnc && !perfMode;
+  if (forcedPerf) {
+    perfMode = true;
+    buildVisuals();
+  }
 
   const state = beginSigilCapture();
 
@@ -2951,14 +2990,13 @@ async function exportSigilMp4WebCodecs(btn) {
   const sx       = FF.cx * dprMp4 - cropSize / 2;
   const sy       = FF.cy * dprMp4 - cropSize / 2;
 
-  // Muxer — in-memory ArrayBuffer target, finalized into a Blob once encoding is done.
   const { Muxer, ArrayBufferTarget } = window.Mp4Muxer;
   const muxer = new Muxer({
     target: new ArrayBufferTarget(),
     video: {
-      codec:  'avc',
-      width:  EXPORT_SIZE,
-      height: EXPORT_SIZE,
+      codec:     'avc',
+      width:     EXPORT_SIZE,
+      height:    EXPORT_SIZE,
       frameRate: FPS,
     },
     fastStart: 'in-memory',
@@ -2969,19 +3007,39 @@ async function exportSigilMp4WebCodecs(btn) {
     output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
     error:  (err) => { encodeError = err; console.error('VideoEncoder error:', err); },
   });
-
   encoder.configure({
-    codec:     'avc1.42001f',       // H.264 Baseline 3.1 — maximum compatibility
+    codec:     chosenCodec,
     width:     EXPORT_SIZE,
     height:    EXPORT_SIZE,
-    bitrate:   16_000_000,           // 16 Mbps
+    bitrate:   BITRATE,
     framerate: FPS,
   });
+
+  // iOS Safari suspends JS when its tab goes hidden. For a long-running encode
+  // that looks like a silent failure. Detect it and abort cleanly with a visible
+  // "KEEP TAB OPEN" hint on the export button.
+  let aborted = false;
+  const onVisChange = () => { if (document.hidden) aborted = true; };
+  document.addEventListener('visibilitychange', onVisChange);
+
+  const cleanupEnv = () => {
+    document.removeEventListener('visibilitychange', onVisChange);
+    if (forcedPerf) restoreExportPerfMode(savedPerfMode);
+  };
+  const failAndReset = (label) => {
+    try { encoder.close(); } catch {}
+    try { endSigilCapture(state); } catch {}
+    cleanupEnv();
+    btn.classList.remove('busy');
+    btn.textContent = label;
+    setTimeout(() => { if (btn.textContent === label) btn.textContent = '⬇ EXPORT'; }, 3500);
+  };
 
   btn.textContent = '⬇ RECORDING 0%';
 
   try {
     for (let i = 0; i < FRAME_COUNT; i++) {
+      if (aborted) throw new Error('tab backgrounded');
       if (encodeError) throw encodeError;
 
       drawSigilCaptureFrame(i / FRAME_COUNT, DURATION, state.rotY, offCtx, EXPORT_SIZE, sx, sy, cropSize);
@@ -2990,19 +3048,17 @@ async function exportSigilMp4WebCodecs(btn) {
         timestamp: i * FRAME_DURATION_US,
         duration:  FRAME_DURATION_US,
       });
-      // Keyframe every 60 frames (≈1s) — keeps seek responsive, adds tiny overhead.
       encoder.encode(frame, { keyFrame: (i % 60 === 0) });
       frame.close();
 
       btn.textContent = `⬇ RECORDING ${Math.round((i / FRAME_COUNT) * 100)}%`;
 
-      // Yield to the event loop so the UI + encoder queue drain.
       if (i % 8 === 0) {
         await new Promise(r => setTimeout(r, 0));
       }
-      // If the encoder backs up (slow device), pause until the queue is healthy.
       while (encoder.encodeQueueSize > 20) {
         await new Promise(r => setTimeout(r, 15));
+        if (aborted) throw new Error('tab backgrounded');
         if (encodeError) throw encodeError;
       }
     }
@@ -3014,16 +3070,18 @@ async function exportSigilMp4WebCodecs(btn) {
     const blob = new Blob([buffer], { type: 'video/mp4' });
 
     endSigilCapture(state);
+    cleanupEnv();
 
     downloadSigilBlob(blob, 'mp4');
     btn.classList.remove('busy');
     btn.textContent = '⬇ EXPORT';
   } catch (err) {
     console.error('MP4 export failed:', err);
-    try { encoder.close(); } catch {}
-    endSigilCapture(state);
-    btn.classList.remove('busy');
-    btn.textContent = '⬇ EXPORT';
+    if (err && String(err.message || err).includes('backgrounded')) {
+      failAndReset('⚠ KEEP TAB OPEN');
+    } else {
+      failAndReset('⚠ EXPORT FAILED');
+    }
   }
 }
 
