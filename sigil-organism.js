@@ -138,7 +138,7 @@ function ringPt(angle, radius, incl, az) {
 function togglePerf() {
   perfMode = !perfMode;
   const btn = document.getElementById('perfBtn');
-  btn.textContent = perfMode ? '⚡ PERF MODE' : '✦ FULL QUALITY';
+  setBtnState(btn, perfMode ? '⚡' : '✦', perfMode ? 'PERF MODE' : 'FULL QUALITY');
   btn.classList.toggle('perf-on', perfMode);
   if (sigil) buildVisuals();
 }
@@ -189,7 +189,7 @@ function renderSigil(data) {
   resetViewZoom();
 
   const perfBtn = document.getElementById('perfBtn');
-  perfBtn.textContent   = perfMode ? '⚡ PERF MODE' : '✦ FULL QUALITY';
+  setBtnState(perfBtn, perfMode ? '⚡' : '✦', perfMode ? 'PERF MODE' : 'FULL QUALITY');
   perfBtn.classList.toggle('perf-on', perfMode);
 
   buildHUD();
@@ -2824,9 +2824,8 @@ async function exportSigilPng() {
     if (!blob) return;
     downloadSigilBlob(blob, 'png');
     if (btn) {
-      const orig = btn.textContent;
-      btn.textContent = '✓ DOWNLOADED';
-      setTimeout(() => { btn.textContent = orig || '⬇ EXPORT'; }, 1200);
+      setBtnState(btn, '✓', 'DOWNLOADED');
+      setTimeout(() => setBtnState(btn, '⬇', 'EXPORT'), 1200);
     }
   }, 'image/png');
 }
@@ -2868,31 +2867,31 @@ async function exportSigilGif() {
     background:   '#000000',
   });
 
-  btn.textContent = '⬇ CAPTURING 0%';
+  setBtnState(btn, '⬇', 'CAPTURING 0%');
 
   try {
     for (let i = 0; i < FRAME_COUNT; i++) {
       drawSigilCaptureFrame(i / FRAME_COUNT, DURATION, state.rotY, offCtx, EXPORT_SIZE, sx, sy, cropSize);
       gif.addFrame(offCtx, { delay: Math.round(1000 / FPS), copy: true });
-      btn.textContent = `⬇ CAPTURING ${Math.round(((i + 1) / FRAME_COUNT) * 100)}%`;
+      setBtnState(btn, '⬇', `CAPTURING ${Math.round(((i + 1) / FRAME_COUNT) * 100)}%`);
       if (i % 3 === 0) await new Promise(r => setTimeout(r, 0));
     }
 
     endSigilCapture(state);  // capture done, resume normal animation
 
-    btn.textContent = '⚙ ENCODING 0%';
-    gif.on('progress',  p => { btn.textContent = `⚙ ENCODING ${Math.round(p * 100)}%`; });
+    setBtnState(btn, '⚙', 'ENCODING 0%');
+    gif.on('progress',  p => setBtnState(btn, '⚙', `ENCODING ${Math.round(p * 100)}%`));
     gif.on('finished',  blob => {
       downloadSigilBlob(blob, 'gif');
       btn.classList.remove('busy');
-      btn.textContent = '⬇ EXPORT';
+      setBtnState(btn, '⬇', 'EXPORT');
     });
     gif.render();
   } catch (err) {
     console.error('GIF export failed:', err);
     endSigilCapture(state);
     btn.classList.remove('busy');
-    btn.textContent = '⬇ EXPORT';
+    setBtnState(btn, '⬇', 'EXPORT');
   }
 }
 
@@ -3031,16 +3030,19 @@ async function exportSigilMp4WebCodecs(btn) {
     document.removeEventListener('visibilitychange', onVisChange);
     if (forcedPerf) restoreExportPerfMode(savedPerfMode);
   };
-  const failAndReset = (label) => {
+  const failAndReset = (icon, label) => {
     try { encoder.close(); } catch {}
     try { endSigilCapture(state); } catch {}
     cleanupEnv();
     btn.classList.remove('busy');
-    btn.textContent = label;
-    setTimeout(() => { if (btn.textContent === label) btn.textContent = '⬇ EXPORT'; }, 3500);
+    setBtnState(btn, icon, label);
+    setTimeout(() => {
+      const cur = btn.querySelector('.btn-icon');
+      if (cur && cur.textContent === icon) setBtnState(btn, '⬇', 'EXPORT');
+    }, 3500);
   };
 
-  btn.textContent = '⬇ RECORDING 0%';
+  setBtnState(btn, '⬇', 'RECORDING 0%');
 
   try {
     for (let i = 0; i < FRAME_COUNT; i++) {
@@ -3056,7 +3058,7 @@ async function exportSigilMp4WebCodecs(btn) {
       encoder.encode(frame, { keyFrame: (i % 60 === 0) });
       frame.close();
 
-      btn.textContent = `⬇ RECORDING ${Math.round((i / FRAME_COUNT) * 100)}%`;
+      setBtnState(btn, '⬇', `RECORDING ${Math.round((i / FRAME_COUNT) * 100)}%`);
 
       if (i % 8 === 0) {
         await new Promise(r => setTimeout(r, 0));
@@ -3079,13 +3081,13 @@ async function exportSigilMp4WebCodecs(btn) {
 
     downloadSigilBlob(blob, 'mp4');
     btn.classList.remove('busy');
-    btn.textContent = '⬇ EXPORT';
+    setBtnState(btn, '⬇', 'EXPORT');
   } catch (err) {
     console.error('MP4 export failed:', err);
     if (err && String(err.message || err).includes('backgrounded')) {
-      failAndReset('⚠ KEEP TAB OPEN');
+      failAndReset('⚠', 'KEEP TAB OPEN');
     } else {
-      failAndReset('⚠ EXPORT FAILED');
+      failAndReset('⚠', 'EXPORT FAILED');
     }
   }
 }
@@ -3146,7 +3148,7 @@ async function exportSigilMp4MediaRecorder(btn) {
     recorder.onerror = e => reject(e);
   });
 
-  btn.textContent = '⬇ RECORDING 0%';
+  setBtnState(btn, '⬇', 'RECORDING 0%');
   recorder.start();
 
   try {
@@ -3160,7 +3162,7 @@ async function exportSigilMp4MediaRecorder(btn) {
       const wait   = Math.max(1, target - performance.now());
       await new Promise(r => setTimeout(r, wait));
       drawSigilCaptureFrame(i / FRAME_COUNT, DURATION, state.rotY, offCtx, EXPORT_SIZE, sx, sy, cropSize);
-      btn.textContent = `⬇ RECORDING ${Math.round((i / FRAME_COUNT) * 100)}%`;
+      setBtnState(btn, '⬇', `RECORDING ${Math.round((i / FRAME_COUNT) * 100)}%`);
     }
 
     recorder.stop();
@@ -3172,14 +3174,14 @@ async function exportSigilMp4MediaRecorder(btn) {
     const blob = new Blob(chunks, { type: picked.mime });
     downloadSigilBlob(blob, picked.ext);
     btn.classList.remove('busy');
-    btn.textContent = '⬇ EXPORT';
+    setBtnState(btn, '⬇', 'EXPORT');
   } catch (err) {
     console.error('MP4 export failed:', err);
     try { recorder.stop(); } catch {}
     endSigilCapture(state);
     restoreExportPerfMode(savedPerfMode);
     btn.classList.remove('busy');
-    btn.textContent = '⬇ EXPORT';
+    setBtnState(btn, '⬇', 'EXPORT');
   }
 }
 

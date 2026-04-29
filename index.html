@@ -447,8 +447,9 @@
   .rainbow-btn:hover { color: #fff !important; }
   .rainbow-btn:hover::before { animation-duration: 5s; }
 
-  /* Top controls — perf + export side by side. Wraps to a second row in narrow
-     viewports (mobile portrait, 6529 preview iframe, etc.) so no button gets clipped. */
+  /* Top controls — single row. On narrow viewports (mobile portrait, 6529 preview
+     iframe, etc.) the .btn-label spans go display:none and only the .btn-icon glyph
+     remains, so all six buttons stay on a single line and never overlap the sigil. */
   #topCtrls {
     position: fixed;
     top: clamp(14px, 2.5vw, 28px);
@@ -456,12 +457,13 @@
     transform: translateX(-50%);
     display: none;
     flex-direction: row;
-    flex-wrap: wrap;
     justify-content: center;
     max-width: calc(100vw - 24px);
     gap: 10px;
     z-index: 300;
   }
+  .btn-icon  { display: inline-block; }
+  .btn-label { display: inline; margin-left: 0.45em; }
 
   #perfBtn, .export-btn {
     background: transparent;
@@ -708,17 +710,20 @@
   /*  MOBILE (≤ 600px) — safe-area, large tap targets, tight layout */
   /* ═══════════════════════════════════════════════════════════ */
   @media (max-width: 600px) {
-    /* Top controls — on mobile, just below the HUD labels */
+    /* Top controls — on mobile, just below the HUD labels. Icon-only buttons
+       so all six fit on a single line; the .btn-label spans are hidden. */
     #topCtrls {
       top: calc(env(safe-area-inset-top, 0px) + 100px);
       gap: 6px;
     }
     #perfBtn, .export-btn {
-      padding: 0.55rem 0.55rem;
-      font-size: 0.50rem;
-      letter-spacing: 0.08em;
+      padding: 0.5rem 0.6rem;
+      font-size: 0.85rem;
+      letter-spacing: 0;
+      min-width: 38px;
       min-height: 36px;
     }
+    .btn-label { display: none; }
 
     /* Export bar — tighter, respects the bottom safe-area */
     #exportBar {
@@ -780,12 +785,14 @@
     #unbornBack   { padding: 0.75rem 1.5rem; min-height: 44px; }
   }
 
-  /* Extra compression for very narrow phones (≤ 360px) */
+  /* Extra compression for very narrow phones (≤ 360px) and tight 6529 iframes */
   @media (max-width: 360px) {
     #perfBtn, .export-btn {
       padding: 0.45rem 0.5rem;
-      font-size: 0.48rem;
+      font-size: 0.78rem;
+      min-width: 34px;
     }
+    #topCtrls { gap: 4px; }
     #exportBar.visible { bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
     .export-opt { padding: 0.45rem 0.55rem; min-width: 62px; }
     .export-opt .opt-label { font-size: 0.68rem; }
@@ -1538,12 +1545,12 @@
 
 <button id="resetBtn" onclick="resetAll()">← new reading</button>
 <div id="topCtrls">
-  <button id="perfBtn" onclick="togglePerf()">⚡ PERF MODE</button>
-  <button id="exportBtn" class="export-btn" onclick="toggleExportBar()">⬇ EXPORT</button>
-  <button id="shareXBtn" class="export-btn" onclick="shareSigilToX()">𝕏 SHARE</button>
-  <button id="archiveBtn" class="export-btn" onclick="openArchive()">◈ ARCHIVE</button>
-  <button id="kinBtn" class="export-btn" onclick="openKin()">◎ KIN</button>
-  <a id="aboutBtn" class="export-btn rainbow-btn" href="about.html" target="_blank" rel="noopener">ⓘ ABOUT</a>
+  <button id="perfBtn" onclick="togglePerf()"><span class="btn-icon">⚡</span><span class="btn-label">PERF MODE</span></button>
+  <button id="exportBtn" class="export-btn" onclick="toggleExportBar()"><span class="btn-icon">⬇</span><span class="btn-label">EXPORT</span></button>
+  <button id="shareXBtn" class="export-btn" onclick="shareSigilToX()"><span class="btn-icon">𝕏</span><span class="btn-label">SHARE</span></button>
+  <button id="archiveBtn" class="export-btn" onclick="openArchive()"><span class="btn-icon">◈</span><span class="btn-label">ARCHIVE</span></button>
+  <button id="kinBtn" class="export-btn" onclick="openKin()"><span class="btn-icon">◎</span><span class="btn-label">KIN</span></button>
+  <a id="aboutBtn" class="export-btn rainbow-btn" href="about.html" target="_blank" rel="noopener"><span class="btn-icon">ⓘ</span><span class="btn-label">ABOUT</span></a>
 </div>
 
 <!-- Export bar — slides up from the bottom, PNG/GIF/MP4 options -->
@@ -1740,10 +1747,23 @@ let perfMode = true;
 let texCanvas = null;
 let texCtx    = null;
 
+// Update a toolbar button's icon + label spans (.btn-icon / .btn-label).
+// On narrow viewports the .btn-label is hidden via CSS so only the icon
+// stays visible; this helper is used from every state transition (perf
+// toggle, export progress, error states) to avoid clobbering the spans
+// with raw textContent assignments.
+function setBtnState(btn, icon, label) {
+  if (!btn) return;
+  const iconEl  = btn.querySelector('.btn-icon');
+  const labelEl = btn.querySelector('.btn-label');
+  if (iconEl)  iconEl.textContent  = icon;
+  if (labelEl) labelEl.textContent = label;
+}
+
 function togglePerf() {
   perfMode = !perfMode;
   const btn = document.getElementById('perfBtn');
-  btn.textContent = perfMode ? '⚡ PERF MODE' : '✦ FULL QUALITY';
+  setBtnState(btn, perfMode ? '⚡' : '✦', perfMode ? 'PERF MODE' : 'FULL QUALITY');
   btn.classList.toggle('perf-on', perfMode);
   if (sigil) buildVisuals();
 }
@@ -1902,7 +1922,7 @@ function renderSigil(data) {
   document.getElementById('resetBtn').style.display   = 'block';
   document.getElementById('topCtrls').style.display   = 'flex';
   const perfBtn = document.getElementById('perfBtn');
-  perfBtn.textContent = perfMode ? '⚡ PERF MODE' : '✦ FULL QUALITY';
+  setBtnState(perfBtn, perfMode ? '⚡' : '✦', perfMode ? 'PERF MODE' : 'FULL QUALITY');
   perfBtn.classList.toggle('perf-on', perfMode);
 
   buildHUD();
